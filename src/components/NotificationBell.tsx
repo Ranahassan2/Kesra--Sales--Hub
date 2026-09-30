@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { playNotificationSound } from "@/lib/audio";
 
 export type AppNotification = {
   id: string;
@@ -20,6 +21,14 @@ export default function NotificationBell() {
   const router = useRouter();
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
+  const prevUnreadRef = useRef(0);
+
+  useEffect(() => {
+    if (unreadCount > prevUnreadRef.current) {
+      playNotificationSound();
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
 
   useEffect(() => {
     fetchNotifications();

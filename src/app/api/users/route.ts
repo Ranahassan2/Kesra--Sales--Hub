@@ -41,7 +41,7 @@ const createUserSchema = z.object({
     .regex(/^[a-zA-Z0-9._-]+$/, "اسم المستخدم يقبل حروف إنجليزي وأرقام فقط"),
   email: z.string().email("إيميل غير صحيح"),
   phone: z.string().optional(),
-  role: z.nativeEnum(),
+  role: z.nativeEnum(Role),
   password: z.string().min(6, "كلمة المرور لازم تكون 6 حروف على الأقل"),
 });
 

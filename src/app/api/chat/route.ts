@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import fs from "fs/promises";
+import path from "path";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,21 @@ export async function GET(req: Request) {
     const currentUserId = session.user.id;
     const { searchParams } = new URL(req.url);
     const withUserId = searchParams.get("userId");
+    const withGroupId = searchParams.get("groupId");
+
+    if (withGroupId) {
+      // Mark incoming messages as read (you can implement Group Message Read Receipts later)
+      // Fetch messages for the group
+      const messages = await prisma.chatMessage.findMany({
+        where: { groupId: withGroupId },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          sender: { select: { id: true, name: true, role: true } },
+        },
+      });
+      return NextResponse.json({ messages: messages.reverse() });
+    }
 
     if (withUserId) {
       // Mark incoming messages as read
@@ -54,8 +71,17 @@ export async function GET(req: Request) {
       },
     });
 
+    const groups = await prisma.chatGroup.findMany({
+      where: { members: { some: { userId: currentUserId } } },
+      select: {
+        id: true,
+        name: true,
+        _count: { select: { members: true } },
+      },
+    });
+
     // Optionally get latest message for each to sort/display
-    const conversations = await Promise.all(users.map(async (u) => {
+    const userConversations = await Promise.all(users.map(async (u) => {
       const latestMsg = await prisma.chatMessage.findFirst({
         where: {
           OR: [
@@ -68,9 +94,25 @@ export async function GET(req: Request) {
       });
       return {
         user: u,
+        isGroup: false,
         latestMessage: latestMsg
       };
     }));
+
+    const groupConversations = await Promise.all(groups.map(async (g) => {
+      const latestMsg = await prisma.chatMessage.findFirst({
+        where: { groupId: g.id },
+        orderBy: { createdAt: "desc" },
+        select: { content: true, createdAt: true, senderId: true, isRead: true }
+      });
+      return {
+        group: g,
+        isGroup: true,
+        latestMessage: latestMsg
+      };
+    }));
+
+    const conversations = [...userConversations, ...groupConversations];
 
     // Sort by latest message time, then active time
     conversations.sort((a, b) => {
@@ -94,17 +136,41 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { content, receiverId } = body;
+    const { content, receiverId, groupId, file } = body;
 
-    if (!content || !receiverId) {
+    if ((!receiverId && !groupId) || (!content && !file)) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+
+    let finalContent = content || "";
+
+    // Handle file upload
+    if (file && file.base64 && file.name) {
+      try {
+        const base64Data = file.base64.includes(',') ? file.base64.split(',')[1] : file.base64;
+        const buffer = Buffer.from(base64Data, 'base64');
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+        await fs.mkdir(uploadDir, { recursive: true });
+        
+        // Sanitize filename and make it unique
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const uniqueName = `${Date.now()}-${safeName}`;
+        const filePath = path.join(uploadDir, uniqueName);
+        
+        await fs.writeFile(filePath, buffer);
+        finalContent = `[FILE:/uploads/${uniqueName}]${file.name}`;
+      } catch (err) {
+        console.error("File upload error:", err);
+        return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
+      }
     }
 
     const message = await prisma.chatMessage.create({
       data: {
-        content: content.trim(),
+        content: finalContent.trim(),
         senderId: session.user.id,
-        receiverId,
+        receiverId: receiverId || null,
+        groupId: groupId || null,
       },
       include: {
         sender: { select: { id: true, name: true, role: true } },

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import DashboardShell from "@/components/DashboardShell";
 import ChangePasswordForm from "@/components/ChangePasswordForm";
+import EditProfileForm from "@/components/EditProfileForm";
+import { prisma } from "@/lib/prisma";
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "مدير النظام",
@@ -14,25 +16,32 @@ const ROLE_LABELS: Record<string, string> = {
 export default async function AccountPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
+  
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, name: true, email: true, phone: true, role: true }
+  });
+  
+  if (!user) redirect("/login");
 
   return (
     <DashboardShell title="حسابي">
-      <div className="mb-6 glass-panel max-w-md p-6">
-        <p className="mb-3 text-sm font-semibold text-white">بيانات الحساب</p>
-        <div className="space-y-1.5 text-sm">
-          <p className="text-slate-400">
-            الاسم: <span className="text-slate-200">{session.user.name}</span>
-          </p>
-          <p className="text-slate-400">
-            الإيميل: <span className="text-slate-200" dir="ltr">{session.user.email}</span>
-          </p>
-          <p className="text-slate-400">
-            الدور: <span className="text-slate-200">{ROLE_LABELS[session.user.role] ?? session.user.role}</span>
-          </p>
+      <div className="mb-6 max-w-md">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-700 text-white font-bold text-2xl shadow-inner border-2 border-white/10">
+            {user.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">{user.name}</h2>
+            <p className="text-sm text-slate-400">{ROLE_LABELS[user.role] ?? user.role}</p>
+          </div>
         </div>
       </div>
 
-      <ChangePasswordForm />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        <EditProfileForm user={user} />
+        <ChangePasswordForm />
+      </div>
     </DashboardShell>
   );
 }

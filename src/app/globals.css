@@ -48,3 +48,13 @@
   .badge-won { @apply badge bg-status-won/15 text-status-won; }
   .badge-lost { @apply badge bg-status-lost/15 text-status-lost; }
 }
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none !important;
+}
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  visibility: hidden !important;
+  display: none !important;
+  pointer-events: none;
+}

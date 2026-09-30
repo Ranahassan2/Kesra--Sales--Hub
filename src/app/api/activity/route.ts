@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const take = Math.min(Number(searchParams.get("take") ?? 100), 300);
 
   const where: any = {};
-  if (type && (Object.values() as string[]).includes(type)) where.type = type;
+  if (type) where.type = type;
   if (q) {
     where.lead = {
       OR: [

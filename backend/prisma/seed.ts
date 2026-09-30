@@ -1,4 +1,4 @@
-import { Role } from "../src/lib/enums";
+import { Role } from "../../src/lib/enums";
 import { PrismaClient, } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -13,7 +13,7 @@ async function main() {
     create: {
       name: "Rana",
       username: "admin",
-      email: "admin@zawolf.ai",
+      email: "admin@kesra.ai",
       passwordHash: password,
       role: Role.ADMIN,
     },
@@ -25,14 +25,14 @@ async function main() {
     create: {
       name: "رئيس المبيعات",
       username: "head.sales",
-      email: "head.sales@zawolf.ai",
+      email: "head.sales@kesra.ai",
       passwordHash: password,
       role: Role.HEAD_OF_SALES,
     },
   });
 
   const teleSalesNames = ["أحمد", "سارة", "محمد", "منة", "يوسف"];
-  const teleSalesUsers = [];
+  const teleSalesUsers: any[] = [];
   for (let i = 0; i < teleSalesNames.length; i++) {
     const u = await prisma.user.upsert({
       where: { username: `tele${i + 1}` },
@@ -40,7 +40,7 @@ async function main() {
       create: {
         name: teleSalesNames[i],
         username: `tele${i + 1}`,
-        email: `tele${i + 1}@zawolf.ai`,
+        email: `tele${i + 1}@kesra.ai`,
         passwordHash: password,
         role: Role.TELE_SALES,
       },
@@ -57,7 +57,7 @@ async function main() {
       create: {
         name: salesNames[i],
         username: `sales${i + 1}`,
-        email: `sales${i + 1}@zawolf.ai`,
+        email: `sales${i + 1}@kesra.ai`,
         passwordHash: password,
         role: Role.SALES,
       },

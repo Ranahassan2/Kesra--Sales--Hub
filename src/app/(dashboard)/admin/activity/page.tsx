@@ -40,7 +40,7 @@ export default async function ActivityLogPage({
 
   const type = searchParams.type;
   const where: any = {};
-  if (type && (Object.values() as string[]).includes(type)) where.type = type;
+  if (type && Object.keys(TYPE_LABELS).includes(type)) where.type = type;
 
   const activities = await prisma.activity.findMany({
     where,

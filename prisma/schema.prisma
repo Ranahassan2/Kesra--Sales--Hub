@@ -49,6 +49,8 @@ model User {
   notifications Notification[]
   sentMessages  ChatMessage[] @relation("SentMessages")
   receivedMessages ChatMessage[] @relation("ReceivedMessages")
+  chatGroups    ChatGroup[]   @relation("GroupCreator")
+  groupMemberships ChatGroupMember[]
 
   @@index([role])
 }
@@ -196,11 +198,36 @@ model ChatMessage {
   content    String
   senderId   String
   sender     User     @relation("SentMessages", fields: [senderId], references: [id])
-  receiverId String
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiverId String?
+  receiver   User?     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  groupId    String?
+  group      ChatGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
   isRead     Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   @@index([senderId, receiverId])
+  @@index([groupId])
   @@index([createdAt])
+}
+
+model ChatGroup {
+  id          String   @id @default(cuid())
+  name        String
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("GroupCreator", fields: [createdById], references: [id])
+
+  members     ChatGroupMember[]
+  messages    ChatMessage[]
+}
+
+model ChatGroupMember {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     ChatGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt  DateTime @default(now())
+
+  @@unique([groupId, userId])
 }
