@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-// Force VSCode TS Server re-evaluation
-
+// Force VSCode TS Server re-evaluation - updated
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 export const prisma =

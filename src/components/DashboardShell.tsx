@@ -3,6 +3,8 @@ import { authOptions } from "@/lib/auth";
 import SignOutButton from "@/components/SignOutButton";
 import DashboardNav from "@/components/DashboardNav";
 import NotificationBell from "@/components/NotificationBell";
+import OnlineUsers from "@/components/OnlineUsers";
+import ChatBox from "@/components/ChatBox";
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "مدير النظام",
@@ -23,7 +25,7 @@ export default async function DashboardShell({
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-white/5 bg-base-950/80 backdrop-blur-glass">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0b101a]/90 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[96%] items-center justify-between px-6 pt-3 pb-1">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4 border-l border-white/10 pl-6">
@@ -36,7 +38,9 @@ export default async function DashboardShell({
               </div>
             </div>
 
-            <div className="hidden sm:block">
+            <div className="hidden sm:flex items-center">
+              <ChatBox />
+              <OnlineUsers />
               <NotificationBell />
             </div>
           </div>
