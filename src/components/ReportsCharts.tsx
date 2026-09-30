@@ -1,0 +1,140 @@
+"use client";
+
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  AreaChart,
+  Area,
+} from "recharts";
+
+const COLORS = {
+  accent: "#7c5cff",
+  accentGlow: "#5eead4",
+  hot: "#ff6b6b",
+  gold: "#facc15",
+  new: "#60a5fa",
+  won: "#4ade80",
+  lost: "#94a3b8",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  NEW: "جديد",
+  CONTACTED: "تم التواصل",
+  NO_ANSWER: "لم يرد",
+  NEEDS_FOLLOWUP: "يحتاج متابعة",
+  INTERESTED: "مهتم",
+  NOT_INTERESTED: "غير مهتم",
+  HOT: "Hot",
+  COLD: "Cold",
+  MEETING_SCHEDULED: "Meeting",
+  TRANSFERRED_TO_SALES: "تحويل لـ Sales",
+  CLOSED_WON: "صفقة ناجحة",
+  CLOSED_LOST: "صفقة خاسرة",
+};
+
+const TIER_COLORS: Record<string, string> = {
+  LEAD: COLORS.new,
+  HOT: COLORS.hot,
+  COLD: COLORS.gold,
+};
+
+const tooltipStyle = {
+  backgroundColor: "#0e1320",
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: "0.75rem",
+  fontSize: "12px",
+  color: "#e2e8f0",
+  direction: "rtl" as const,
+};
+
+export function StatusBarChart({ data }: { data: { status: string; count: number }[] }) {
+  const chartData = data.map((d) => ({ name: STATUS_LABELS[d.status] ?? d.status, count: d.count }));
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <BarChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+        <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} interval={0} angle={-25} textAnchor="end" height={60} />
+        <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} allowDecimals={false} />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+        <Bar dataKey="count" fill={COLORS.accent} radius={[6, 6, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function TierPieChart({ data }: { data: { tier: string; count: number }[] }) {
+  const chartData = data.map((d) => ({ name: d.tier, value: d.count }));
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <PieChart>
+        <Pie
+          data={chartData}
+          dataKey="value"
+          nameKey="name"
+          cx="50%"
+          cy="50%"
+          innerRadius={55}
+          outerRadius={90}
+          paddingAngle={3}
+        >
+          {chartData.map((entry) => (
+            <Cell key={entry.name} fill={TIER_COLORS[entry.name] ?? COLORS.accent} />
+          ))}
+        </Pie>
+        <Legend wrapperStyle={{ fontSize: "12px", color: "#94a3b8" }} />
+        <Tooltip contentStyle={tooltipStyle} />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function TeamPerformanceChart({
+  data,
+}: {
+  data: { name: string; role: string; count: number }[];
+}) {
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+        <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+        <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} allowDecimals={false} />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+        <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+          {data.map((entry) => (
+            <Cell key={entry.name} fill={entry.role === "SALES" ? COLORS.accentGlow : COLORS.accent} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function LeadsOverTimeChart({ data }: { data: { date: string; count: number }[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <AreaChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 8 }}>
+        <defs>
+          <linearGradient id="leadsGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={COLORS.accent} stopOpacity={0.5} />
+            <stop offset="95%" stopColor={COLORS.accent} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+        <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+        <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} allowDecimals={false} />
+        <Tooltip contentStyle={tooltipStyle} />
+        <Area type="monotone" dataKey="count" stroke={COLORS.accent} fill="url(#leadsGradient)" strokeWidth={2} />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}

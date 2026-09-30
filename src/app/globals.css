@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  
+  option {
+    background-color: #0f172a;
+    color: #f1f5f9;
+  }
+
+  body {
+    @apply bg-base-950 text-slate-200;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-[#0e1320] border border-[#1b2438] rounded-xl shadow-md;
+  }
+
+  .glass-card {
+    @apply glass-panel p-5 transition-colors hover:bg-[#131a2b];
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition hover:bg-accent-soft disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[#1b2438] bg-[#0a0e18] px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-[#131a2b];
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-[#1b2438] bg-[#05070d] px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+
+  .badge-hot { @apply badge bg-status-hot/15 text-status-hot; }
+  .badge-gold { @apply badge bg-status-gold/15 text-status-gold; }
+  .badge-new { @apply badge bg-status-new/15 text-status-new; }
+  .badge-won { @apply badge bg-status-won/15 text-status-won; }
+  .badge-lost { @apply badge bg-status-lost/15 text-status-lost; }
+}

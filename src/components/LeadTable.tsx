@@ -1,0 +1,1012 @@
+"use client";
+
+import { Fragment, useMemo, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import StatusBadge from "@/components/StatusBadge";
+import TierBadge from "@/components/TierBadge";
+
+type SalesOption = { id: string; name: string; lastActiveAt?: Date | string | null };
+
+export interface FollowUpRow {
+  id: string;
+  scheduledDate: string;
+  notes: string;
+  isCompleted: boolean;
+}
+
+export interface MeetingRow {
+  id: string;
+  scheduledAt: string;
+  status: string;
+  result: string | null;
+  notes: string | null;
+}
+
+export interface ActivityRow {
+  id: string;
+  type: string;
+  message: string;
+  createdAt: string;
+  user?: { name: string } | null;
+}
+
+export interface LeadRow {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  company: string | null;
+  need?: string | null;
+  interestReason?: string | null;
+  notes?: string | null;
+  storeUrl?: string | null;
+  socialMediaUrl?: string | null;
+  status: string;
+  tier: string;
+  assignedTo: { id: string; name: string; role: string } | null;
+  currentStage: string;
+  createdAt: string;
+  updatedAt: string;
+  followUps?: FollowUpRow[];
+  meetings?: MeetingRow[];
+  activities?: ActivityRow[];
+}
+
+const STATUS_LABELS_FOR_SELECT: { value: string; label: string }[] = [
+  { value: "NEW", label: "جديد" },
+  { value: "CONTACTED", label: "تم التواصل" },
+  { value: "NO_ANSWER", label: "لم يتم الرد" },
+  { value: "NEEDS_FOLLOWUP", label: "يحتاج متابعة" },
+  { value: "INTERESTED", label: "مهتم" },
+  { value: "NOT_INTERESTED", label: "غير مهتم" },
+];
+const TIER_OPTIONS = ["WARM", "HOT", "COLD"];
+const MEETING_STATUS_OPTIONS = [
+  { value: "SCHEDULED", label: "مجدول" },
+  { value: "DONE", label: "تم" },
+  { value: "POSTPONED", label: "تأجل" },
+  { value: "CANCELLED", label: "أُلغي" },
+];
+
+function formatDateTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleString("ar-EG", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+export default function LeadTable({
+  leads,
+  showAssignee,
+  allowTransfer,
+  canDelete,
+  salesTeam,
+}: {
+  leads: LeadRow[];
+  showAssignee?: boolean;
+  allowTransfer?: boolean;
+  canDelete?: boolean;
+  salesTeam?: SalesOption[];
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [modalMode, setModalMode] = useState<"edit" | "details" | "status" | "task" | "transfer">("details");
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("ALL");
+
+  useEffect(() => {
+    const q = searchParams.get("search");
+    const statusParam = searchParams.get("status");
+    
+    if (q || statusParam) {
+      if (q) setSearch(q);
+      if (statusParam) setFilterStatus(statusParam);
+      
+      // Clean the URL immediately so refreshing doesn't keep the filters
+      router.replace(window.location.pathname, { scroll: false });
+    }
+  }, [searchParams, router]);
+  const [dateFilter, setDateFilter] = useState("ALL");
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newLead, setNewLead] = useState({ name: "", phone: "", company: "", need: "" });
+
+  async function call(url: string, method: string, body?: any) {
+    setBusy(true);
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "حدث خطأ");
+      router.refresh();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("refreshNotifications"));
+      }
+      return data;
+    } catch (e: any) {
+      alert(e.message);
+      throw e;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAddLead() {
+    if (!newLead.name || !newLead.phone) return alert("الاسم ورقم الهاتف مطلوبين");
+    await call("/api/leads", "POST", newLead);
+    setShowAddModal(false);
+    setNewLead({ name: "", phone: "", company: "", need: "" });
+  }
+
+  const counts = useMemo(() => ({
+    ALL: leads.length,
+    NEW: leads.filter(l => l.status === "NEW").length,
+    NEEDS_FOLLOWUP: leads.filter(l => l.status === "NEEDS_FOLLOWUP").length,
+    CONTACTED: leads.filter(l => l.status === "CONTACTED").length,
+    NO_ANSWER: leads.filter(l => l.status === "NO_ANSWER").length,
+    INTERESTED: leads.filter(l => l.status === "INTERESTED").length,
+    NOT_INTERESTED: leads.filter(l => l.status === "NOT_INTERESTED").length,
+    TRANSFERRED_TO_SALES: leads.filter(l => l.status === "TRANSFERRED_TO_SALES").length,
+  }), [leads]);
+
+  const tabs = [
+    { id: "ALL", label: "الكل", count: counts.ALL, bg: "bg-[#182032] text-slate-300 border border-white/5", badge: "bg-white/10 text-slate-300" },
+    { id: "NEW", label: "جديد", count: counts.NEW, bg: "bg-[#182032] text-slate-300 border border-white/5", badge: "bg-blue-500/20 text-blue-400" },
+    { id: "NEEDS_FOLLOWUP", label: "متابعة", count: counts.NEEDS_FOLLOWUP, bg: "bg-[#182032] text-slate-300 border border-white/5", badge: "bg-yellow-500/20 text-yellow-500" },
+    { id: "CONTACTED", label: "تم التواصل", count: counts.CONTACTED, bg: "bg-[#182032] text-slate-300 border border-white/5", badge: "bg-emerald-500/20 text-emerald-500" },
+    { id: "INTERESTED", label: "مهتم", count: counts.INTERESTED, bg: "bg-[#182032] text-slate-300 border border-white/5", badge: "bg-green-500/20 text-green-400" },
+    { id: "NOT_INTERESTED", label: "غير مهتم", count: counts.NOT_INTERESTED, bg: "bg-[#182032] text-slate-300 border border-white/5", badge: "bg-red-500/20 text-red-400" },
+    { id: "NO_ANSWER", label: "غير متاح", count: counts.NO_ANSWER, bg: "bg-[#182032] text-slate-300 border border-white/5", badge: "bg-rose-500/20 text-rose-500" },
+    { id: "TRANSFERRED_TO_SALES", label: "تم التحويل", count: counts.TRANSFERRED_TO_SALES, bg: "bg-[#182032] text-slate-300 border border-white/5", badge: "bg-purple-500/20 text-purple-400" },
+  ];
+
+  const filtered = useMemo(() => {
+    let list = leads;
+    if (filterStatus !== "ALL") {
+      list = list.filter((l) => l.status === filterStatus);
+    }
+
+    const now = new Date();
+    if (dateFilter === "NEW_LEADS") {
+      list = list.filter((l) => {
+        const diffDays = (now.getTime() - new Date(l.createdAt).getTime()) / (1000 * 3600 * 24);
+        return diffDays <= 7;
+      });
+    } else if (dateFilter === "OLD_LEADS") {
+      list = list.filter((l) => {
+        const diffDays = (now.getTime() - new Date(l.createdAt).getTime()) / (1000 * 3600 * 24);
+        return diffDays > 30;
+      });
+    }
+
+    // sort by newest by default
+    list = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const q = search.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((lead) =>
+      [lead.name, lead.phone, lead.company, lead.email, lead.assignedTo?.name]
+        .filter(Boolean)
+        .some((field) => field!.toLowerCase().includes(q))
+    );
+  }, [leads, search, filterStatus, dateFilter]);
+
+  const AVATAR_COLORS = [
+    "bg-indigo-500", "bg-blue-500", "bg-emerald-500", "bg-orange-400", "bg-pink-500", "bg-yellow-500", "bg-purple-500"
+  ];
+  function getAvatarColor(id: string) {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  }
+
+  return (
+    <div className="w-full">
+      {/* Header & Controls */}
+      <div className="flex flex-col gap-4 mb-6 mt-4">
+        {/* Title & Count */}
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-white">جميع العملاء</h2>
+          <span className="bg-[#1f2937] text-slate-300 px-3 py-1 rounded-full text-xs font-bold shadow-inner">{leads.length}</span>
+        </div>
+
+        {/* Search & Filters & Add Button */}
+        <div className="flex flex-col md:flex-row items-center justify-between w-full gap-4">
+          <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+            {/* Search Input */}
+            <div className="relative w-full md:w-[360px]">
+              <input
+                type="text"
+                placeholder="بحث بالاسم، الهاتف، أو الحالة..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-[#1e293b] border border-slate-700/50 text-slate-200 text-base rounded-xl pl-4 pr-12 py-3.5 outline-none focus:border-indigo-500/50 transition-colors placeholder:text-slate-400 shadow-sm"
+              />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              {/* Filter Dropdown */}
+              <div className="relative w-full md:w-56">
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full bg-[#1e293b] border border-slate-700/50 text-slate-200 text-base rounded-xl pl-4 pr-10 py-3.5 outline-none shadow-sm hover:border-slate-600 transition-colors appearance-none cursor-pointer"
+                >
+                  {tabs.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.label} ({t.count})
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Sort Dropdown */}
+              <select 
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="bg-[#1e293b] border border-slate-700/50 text-slate-200 text-base rounded-xl px-5 py-3.5 outline-none shadow-sm hover:border-slate-600 transition-colors hidden md:block cursor-pointer"
+              >
+                <option value="ALL">الكل (الأحدث أولاً)</option>
+                <option value="NEW_LEADS">العملاء الجدد</option>
+                <option value="OLD_LEADS">العملاء القدامى (شهر+)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Add New Lead Button */}
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="bg-[#3b82f6] hover:bg-blue-600 text-white px-5 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center gap-2 shadow-sm w-full md:w-auto justify-center"
+          >
+            إضافة عميل جديد
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="p-16 text-center text-sm text-slate-500 bg-[#121826] rounded-2xl border border-white/5">
+          {leads.length === 0 ? "لا يوجد عملاء حاليًا" : "لا يوجد نتائج مطابقة للبحث"}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {filtered.map((lead) => {
+            const latestActivity = lead.activities?.[0];
+            const isSelected = openId === lead.id;
+            const avatarColor = getAvatarColor(lead.id);
+
+            return (
+              <div key={lead.id} className="bg-[#121826] rounded-2xl p-5 flex flex-col gap-4 relative border border-white/5 hover:border-white/10 transition-colors shadow-lg group">
+                {/* Header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 shrink-0 rounded-full ${avatarColor} flex items-center justify-center text-white text-xl shadow-inner`}>
+                      👤
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-white truncate text-[15px]">{lead.name}</h3>
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{lead.company || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2.5">
+                    <div className="relative">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === lead.id ? null : lead.id); }}
+                        className="text-slate-500 hover:text-white transition-colors p-1"
+                        title="الإجراءات"
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="1"></circle>
+                          <circle cx="12" cy="5" r="1"></circle>
+                          <circle cx="12" cy="19" r="1"></circle>
+                        </svg>
+                      </button>
+                      
+                      {openDropdown === lead.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); }}></div>
+                          <div className="absolute left-0 mt-2 w-56 bg-[#0f1523] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col py-1">
+
+                            <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("edit"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-right w-full">
+                              <span>✏️</span> تعديل البيانات
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("status"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-right w-full">
+                              <span>⏱️</span> أكشن مع العميل
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("task"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-right w-full">
+                              <span>📅</span> إضافة متابعة مع العميل
+                            </button>
+
+                            {allowTransfer && (
+                              <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("transfer"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-indigo-500/20 hover:text-indigo-400 transition-colors text-right w-full">
+                                <span>👥</span> تحويل إلى موظف سيلز
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button onClick={(e) => { 
+                                e.stopPropagation();
+                                if (confirm(`متأكد إنك عاوز تحذف العميل نهائيًا؟`)) {
+                                  call(`/api/leads/${lead.id}`, "DELETE").catch(() => {});
+                                }
+                                setOpenDropdown(null);
+                              }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-status-hot hover:bg-rose-500/10 transition-colors text-right w-full border-t border-white/5 mt-1 pt-2.5">
+                                <span>🗑️</span> حذف العميل
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-row-reverse">
+                      <StatusBadge status={lead.status} />
+                      <TierBadge tier={lead.tier} />
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 mt-1">
+                      {lead.status === "TRANSFERRED_TO_SALES" && lead.assignedTo?.name && (
+                        <span className="text-xs text-indigo-300 font-semibold px-2.5 py-1 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                          مع: {lead.assignedTo.name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-3 mt-1 flex-1">
+                  <div className="flex items-center gap-3 text-xs text-slate-300">
+                    <span className="text-slate-500 text-sm">📞</span>
+                    <span dir="ltr" className="text-slate-300 font-medium tracking-wide">{lead.phone}</span>
+                  </div>
+                  {(lead.storeUrl || lead.socialMediaUrl) && (
+                    <div className="flex items-start gap-3 text-xs text-slate-300 overflow-hidden">
+                      <span className="text-slate-500 text-sm mt-0.5">🔗</span>
+                      <div className="flex flex-col min-w-0 flex-1 gap-1.5">
+                        {lead.storeUrl && lead.storeUrl.split(',').filter(Boolean).map((url, idx) => (
+                          <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition-colors truncate w-full block" dir="ltr" title={`المتجر ${idx + 1}`}>
+                            {url}
+                          </a>
+                        ))}
+                        {lead.socialMediaUrl && lead.socialMediaUrl.split(',').filter(Boolean).map((url, idx) => (
+                          <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition-colors truncate w-full block" dir="ltr" title={`سوشيال ميديا ${idx + 1}`}>
+                            {url}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-start gap-3 text-xs text-slate-300">
+                    <span className="text-slate-500 text-sm mt-0.5">🗓️</span>
+                    <span className="text-slate-400 truncate w-full block mt-0.5">
+                      {latestActivity ? `آخر تواصل: ${formatDateTime(latestActivity.createdAt)}` : "لم يتم التواصل بعد"}
+                    </span>
+                  </div>
+                  
+                  {/* Notes box exactly like screenshot */}
+                  {lead.notes ? (
+                    <div className="mt-4 bg-[#182032] border border-white/5 p-3 rounded-xl text-xs text-slate-300 text-center truncate shadow-inner font-medium" title={lead.notes}>
+                      {lead.notes}
+                    </div>
+                  ) : lead.need ? (
+                    <div className="mt-4 bg-[#182032] border border-white/5 p-3 rounded-xl text-xs text-slate-300 text-center truncate shadow-inner font-medium" title={lead.need}>
+                      {lead.need}
+                    </div>
+                  ) : (
+                    <div className="mt-4 bg-[#182032] border border-white/5 p-3 rounded-xl text-[11px] text-slate-500 text-center shadow-inner font-medium">
+                      لا يوجد ملاحظات أو احتياجات
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="mt-2 pt-4 flex gap-3 border-t border-white/[0.03]">
+                  <a 
+                    href={`https://wa.me/${lead.phone.startsWith("0") ? "2" + lead.phone : lead.phone}`} 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 text-[13px] transition-colors text-center flex items-center justify-center gap-2 font-semibold shadow-[0_4px_12px_rgba(79,70,229,0.3)]"
+                  >
+                    واتساب 💬
+                  </a>
+                  <button 
+                    onClick={() => { setOpenId(lead.id); setModalMode("details"); }} 
+                    className="flex-1 bg-[#1f2937] hover:bg-[#374151] text-slate-300 rounded-xl py-3 text-[13px] transition-colors font-semibold"
+                  >
+                    عرض التفاصيل
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modal for Details */}
+      {openId && leads.some(l => l.id === openId) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => { setOpenId(null); if(searchParams.get("leadId")) router.replace(window.location.pathname, {scroll: false}); }}>
+          <div 
+            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl bg-[#0f1523] border border-[#1b2438] p-6 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button onClick={() => { setOpenId(null); if(searchParams.get("leadId")) router.replace(window.location.pathname, {scroll: false}); }} className="absolute top-5 left-5 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors">✕</button>
+            <h2 className="text-xl font-bold text-white mb-6 border-b border-white/5 pb-4">
+              {modalMode === "edit" ? "بيانات العميل" :
+               modalMode === "status" ? "أكشن مع العميل" :
+               modalMode === "task" ? "إضافة متابعة مع العميل" :
+               modalMode === "transfer" ? "تحويل العميل إلى موظف Sales" :
+               "تفاصيل العميل"}: {leads.find(l => l.id === openId)?.name}
+            </h2>
+            <LeadActions
+              lead={leads.find(l => l.id === openId)!}
+              mode={modalMode}
+              busy={busy}
+              allowTransfer={allowTransfer}
+              canDelete={canDelete}
+              salesTeam={salesTeam}
+              onStatus={(status) => call(`/api/leads/${openId}/status`, "PATCH", { status })}
+              onTier={(tier) => call(`/api/leads/${openId}/status`, "PATCH", { tier })}
+              onFollowUp={(payload) => call(`/api/leads/${openId}/followup`, "POST", payload)}
+              onCompleteFollowUp={(followUpId, isCompleted) =>
+                call(`/api/leads/${openId}/followup`, "PATCH", { followUpId, isCompleted })
+              }
+              onMeeting={(payload) => call(`/api/leads/${openId}/meeting`, "POST", payload)}
+              onMeetingUpdate={(payload) =>
+                call(`/api/leads/${openId}/meeting`, "PATCH", payload)
+              }
+              onTransfer={(salesEmployeeId) =>
+                call(`/api/leads/${openId}/transfer`, "POST", { salesEmployeeId })
+              }
+              onEditDetails={(payload) => call(`/api/leads/${openId}`, "PATCH", payload)}
+              onDelete={() => {
+                if (confirm(`متأكد إنك عاوز تحذف العميل نهائيًا؟`)) {
+                  call(`/api/leads/${openId}`, "DELETE")
+                    .then(() => setOpenId(null))
+                    .catch(() => {});
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Add Lead Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShowAddModal(false)}>
+          <div className="w-full max-w-md rounded-3xl bg-[#0f1523] border border-[#1b2438] p-6 shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowAddModal(false)} className="absolute top-5 left-5 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors">✕</button>
+            <h3 className="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">إضافة عميل جديد يدويًا</h3>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-slate-300 mb-1">اسم العميل *</p>
+                <input
+                  className="w-full bg-[#1e293b] border border-slate-700/50 text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-indigo-500/50 transition-colors placeholder:text-slate-500"
+                  placeholder="الاسم"
+                  value={newLead.name}
+                  onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-300 mb-1">رقم الهاتف *</p>
+                <input
+                  className="w-full bg-[#1e293b] border border-slate-700/50 text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-indigo-500/50 transition-colors placeholder:text-slate-500"
+                  placeholder="رقم الهاتف"
+                  value={newLead.phone}
+                  onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
+                />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-300 mb-1">الشركة (اختياري)</p>
+                <input
+                  className="w-full bg-[#1e293b] border border-slate-700/50 text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-indigo-500/50 transition-colors placeholder:text-slate-500"
+                  placeholder="الشركة"
+                  value={newLead.company}
+                  onChange={(e) => setNewLead({ ...newLead, company: e.target.value })}
+                />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-300 mb-1">الاحتياج (اختياري)</p>
+                <input
+                  className="w-full bg-[#1e293b] border border-slate-700/50 text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-indigo-500/50 transition-colors placeholder:text-slate-500"
+                  placeholder="الاحتياج"
+                  value={newLead.need}
+                  onChange={(e) => setNewLead({ ...newLead, need: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="mt-8 flex justify-end gap-3">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+                disabled={busy}
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleAddLead}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                disabled={busy || !newLead.name || !newLead.phone}
+              >
+                {busy ? "جاري الإضافة..." : "إضافة العميل"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LeadActions({
+  lead,
+  mode,
+  busy,
+  allowTransfer,
+  canDelete,
+  salesTeam,
+  onStatus,
+  onTier,
+  onFollowUp,
+  onCompleteFollowUp,
+  onMeeting,
+  onMeetingUpdate,
+  onTransfer,
+  onEditDetails,
+  onDelete,
+}: {
+  lead: LeadRow;
+  mode: "edit" | "details" | "status" | "task" | "transfer";
+  busy: boolean;
+  allowTransfer?: boolean;
+  canDelete?: boolean;
+  salesTeam?: SalesOption[];
+  onStatus: (status: string) => void;
+  onTier: (tier: string) => void;
+  onFollowUp: (payload: { scheduledDate?: string; notes?: string }) => void;
+  onCompleteFollowUp: (followUpId: string, isCompleted: boolean) => void;
+  onMeeting: (payload: { scheduledAt: string; notes?: string }) => any;
+  onMeetingUpdate: (payload: {
+    meetingId: string;
+    status?: string;
+    result?: string;
+  }) => void;
+  onTransfer: (salesEmployeeId: string) => any;
+  onEditDetails: (payload: Record<string, string>) => any;
+  onDelete: () => void;
+}) {
+  const [followUpDate, setFollowUpDate] = useState("");
+  const [followUpNotes, setFollowUpNotes] = useState("");
+  const [meetingDate, setMeetingDate] = useState("");
+  const [meetingNotes, setMeetingNotes] = useState("");
+  const [selectedSales, setSelectedSales] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [storeUrls, setStoreUrls] = useState<string[]>(
+    lead.storeUrl ? lead.storeUrl.split(',').filter(Boolean) : [""]
+  );
+  const [socialMediaUrls, setSocialMediaUrls] = useState<string[]>(
+    lead.socialMediaUrl ? lead.socialMediaUrl.split(',').filter(Boolean) : [""]
+  );
+  const [edit, setEdit] = useState({
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email ?? "",
+    company: lead.company ?? "",
+    need: lead.need ?? "",
+    interestReason: lead.interestReason ?? "",
+    notes: lead.notes ?? "",
+    storeUrl: lead.storeUrl ?? "",
+    socialMediaUrl: lead.socialMediaUrl ?? "",
+    tier: (lead.tier === "LEAD" || !lead.tier) ? "WARM" : lead.tier,
+  });
+
+  const latestMeeting = lead.meetings?.[0];
+  const [meetingStatus, setMeetingStatus] = useState(latestMeeting?.status ?? "SCHEDULED");
+  const [meetingResult, setMeetingResult] = useState(latestMeeting?.result ?? "");
+
+  const pendingFollowUps = (lead.followUps ?? []).filter((f) => !f.isCompleted);
+
+  return (
+    <div className="space-y-6">
+      {mode === "edit" && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <p className="mb-1 text-xs text-slate-500">الاسم</p>
+            <input
+              className="input-field text-sm w-full py-3"
+              placeholder="الاسم"
+              value={edit.name}
+              onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-slate-500">الهاتف</p>
+            <input
+              className="input-field text-sm w-full py-3"
+              placeholder="الهاتف"
+              dir="ltr"
+              value={edit.phone}
+              onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-slate-500">الإيميل</p>
+            <input
+              className="input-field text-sm w-full py-3"
+              placeholder="الإيميل"
+              dir="ltr"
+              value={edit.email}
+              onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-slate-500">الشركة</p>
+            <input
+              className="input-field text-sm w-full py-3"
+              placeholder="الشركة"
+              value={edit.company}
+              onChange={(e) => setEdit({ ...edit, company: e.target.value })}
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-slate-500">الاحتياج</p>
+            <input
+              className="input-field text-sm w-full py-3"
+              placeholder="الاحتياج"
+              value={edit.need}
+              onChange={(e) => setEdit({ ...edit, need: e.target.value })}
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-slate-500">حالة العميل</p>
+            <select
+              className="input-field text-sm w-full py-3"
+              value={edit.tier}
+              onChange={(e) => setEdit({ ...edit, tier: e.target.value })}
+            >
+              {TIER_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s === "HOT" ? "Hot 🔥" : s === "WARM" ? "Warm" : s === "COLD" ? "Cold ❄️" : "عادي"}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-3">
+            <p className="mb-1 text-xs text-slate-500">ملاحظات عامة</p>
+            <textarea
+              className="input-field text-sm w-full py-3"
+              placeholder="ملاحظات عامة..."
+              rows={3}
+              value={edit.notes}
+              onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
+            />
+          </div>
+          <div className="sm:col-span-3">
+            <p className="mb-1 text-xs text-slate-500">لينك المتجر / الموقع</p>
+            <div className="space-y-3">
+              {storeUrls.map((url, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    className="input-field text-sm flex-1 py-3"
+                    placeholder="https://example.com"
+                    dir="ltr"
+                    type="url"
+                    value={url}
+                    onChange={(e) => {
+                      const newUrls = [...storeUrls];
+                      newUrls[idx] = e.target.value;
+                      setStoreUrls(newUrls);
+                    }}
+                  />
+                  {url && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-ghost px-4 py-3 text-sm text-accent-soft whitespace-nowrap"
+                    >
+                      فتح ↗
+                    </a>
+                  )}
+                  {storeUrls.length > 1 && (
+                    <button
+                      onClick={() => setStoreUrls(storeUrls.filter((_, i) => i !== idx))}
+                      className="btn-ghost px-4 py-3 text-sm text-status-hot"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setStoreUrls([...storeUrls, ""])}
+              className="mt-3 text-sm font-semibold text-accent-soft hover:text-accent transition-colors"
+            >
+              + إضافة رابط آخر
+            </button>
+          </div>
+          <div className="sm:col-span-3">
+            <p className="mb-1 text-xs text-slate-500">روابط حسابات السوشيال ميديا</p>
+            <div className="space-y-3">
+              {socialMediaUrls.map((url, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    className="input-field text-sm flex-1 py-3"
+                    placeholder="أدخل الرابط هنا..."
+                    dir="ltr"
+                    type="url"
+                    value={url}
+                    onChange={(e) => {
+                      const newUrls = [...socialMediaUrls];
+                      newUrls[idx] = e.target.value;
+                      setSocialMediaUrls(newUrls);
+                    }}
+                  />
+                  {url && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-ghost px-4 py-3 text-sm text-accent-soft whitespace-nowrap"
+                    >
+                      فتح ↗
+                    </a>
+                  )}
+                  {socialMediaUrls.length > 1 && (
+                    <button
+                      onClick={() => setSocialMediaUrls(socialMediaUrls.filter((_, i) => i !== idx))}
+                      className="btn-ghost px-4 py-3 text-sm text-status-hot"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setSocialMediaUrls([...socialMediaUrls, ""])}
+              className="mt-3 text-sm font-semibold text-accent-soft hover:text-accent transition-colors"
+            >
+              + إضافة رابط آخر
+            </button>
+          </div>
+          <div className="flex gap-3 sm:col-span-3 mt-2">
+            <button
+              disabled={busy || !edit.name || !edit.phone || saved}
+              onClick={async () => {
+                try {
+                  const { tier, ...restEdit } = edit;
+                  await onEditDetails({ ...restEdit, storeUrl: storeUrls.filter(Boolean).join(','), socialMediaUrl: socialMediaUrls.filter(Boolean).join(',') });
+                  if (tier !== lead.tier) {
+                    await onTier(tier);
+                  }
+                  setSaved(true);
+                  setTimeout(() => setSaved(false), 2000);
+                } catch (e) {
+                  // error handled by call function
+                }
+              }}
+              className={`text-sm py-3 px-6 flex-1 transition-colors ${saved ? 'bg-emerald-500 text-white rounded-xl shadow-lg font-semibold' : 'btn-primary'}`}
+            >
+              {saved ? "تم الحفظ بنجاح ✓" : "حفظ التعديلات"}
+            </button>
+            {canDelete && (
+              <button disabled={busy} onClick={onDelete} className="btn-ghost text-sm py-3 px-6 text-status-hot">
+                حذف العميل نهائيًا
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {mode === "status" && (
+        <div className="space-y-4 max-w-sm mx-auto">
+          <p className="text-sm font-semibold text-slate-400 mb-2">أكشن مع العميل</p>
+          <select
+            disabled={busy}
+            defaultValue={lead.status}
+            onChange={(e) => onStatus(e.target.value)}
+            className="input-field text-sm py-3 w-full"
+          >
+            {STATUS_LABELS_FOR_SELECT.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {mode === "task" && (
+        <div className="space-y-8 max-w-lg mx-auto">
+          <div className="space-y-2 mb-6">
+            <p className="text-sm font-semibold text-slate-400">تحديث الحالة</p>
+            <select
+              disabled={busy}
+              defaultValue={lead.status}
+              onChange={(e) => onStatus(e.target.value)}
+              className="input-field text-sm py-3 w-full"
+            >
+              {STATUS_LABELS_FOR_SELECT.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-3 pb-6">
+            <h3 className="text-lg font-bold text-accent-soft mb-4">إضافة متابعة</h3>
+            <input
+              type="datetime-local"
+              className="input-field text-sm py-3 w-full"
+              value={followUpDate}
+              onChange={(e) => setFollowUpDate(e.target.value)}
+            />
+            <div className="space-y-1 mt-2">
+              <p className="text-xs text-slate-500">ملاحظات المتابعة</p>
+              <textarea
+                rows={3}
+                placeholder="اكتب ملاحظات المتابعة هنا..."
+                className="input-field text-sm resize-none py-3 w-full"
+                value={followUpNotes}
+                onChange={(e) => setFollowUpNotes(e.target.value)}
+              />
+            </div>
+            <button
+              disabled={busy || saved}
+              onClick={async () => {
+                try {
+                  await onFollowUp({ scheduledDate: followUpDate ? new Date(followUpDate).toISOString() : undefined, notes: followUpNotes });
+                  setFollowUpDate("");
+                  setFollowUpNotes("");
+                  setSaved(true);
+                  setTimeout(() => setSaved(false), 2000);
+                } catch (e) {
+                  // handle
+                }
+              }}
+              className={`w-full text-sm py-3 mt-4 transition-colors ${saved ? 'bg-emerald-500 text-white rounded-xl shadow-lg font-semibold' : 'btn-primary'}`}
+            >
+              {saved ? "تم حفظ المتابعة بنجاح ✓" : "حفظ المتابعة"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === "transfer" && allowTransfer && (
+        <div className="space-y-6 max-w-md mx-auto">
+          <h3 className="text-lg font-bold text-indigo-400 mb-4 border-b border-white/5 pb-2">تحويل العميل إلى موظف Sales</h3>
+          
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-slate-400">تحويل إلى Sales</p>
+            <select
+              className="input-field text-sm py-3 w-full"
+              value={selectedSales}
+              onChange={(e) => setSelectedSales(e.target.value)}
+            >
+              <option value="">اختر موظف Sales</option>
+              {salesTeam?.map((s) => {
+                let dot = "⚫";
+                if (s.lastActiveAt) {
+                  const diffMinutes = (Date.now() - new Date(s.lastActiveAt).getTime()) / 1000 / 60;
+                  if (diffMinutes < 10) dot = "🟢";
+                  else if (diffMinutes < 60) dot = "🟡";
+                }
+                return (
+                  <option key={s.id} value={s.id}>
+                    {dot} {s.name}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <p className="text-sm font-semibold text-slate-400">تحديد Meeting جديد</p>
+            <input
+              type="datetime-local"
+              className="input-field text-sm py-3 w-full"
+              value={meetingDate}
+              onChange={(e) => setMeetingDate(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1 pt-2">
+            <p className="text-xs text-slate-500">ملاحظات للـ Sales عن العميل</p>
+            <textarea
+              rows={3}
+              placeholder="اكتب ما يحتاج موظف Sales يعرفه عن العميل..."
+              className="input-field text-sm resize-none py-3 w-full"
+              value={meetingNotes}
+              onChange={(e) => setMeetingNotes(e.target.value)}
+            />
+          </div>
+
+          <button
+            disabled={busy}
+            onClick={async () => {
+              if (!meetingDate && !selectedSales) {
+                alert("يرجى إدخال الموعد أو اختيار موظف المبيعات أولاً");
+                return;
+              }
+              try {
+                if (meetingDate) {
+                  await onMeeting({
+                    scheduledAt: new Date(meetingDate).toISOString(),
+                    notes: meetingNotes || undefined,
+                  });
+                }
+                if (selectedSales) {
+                  await onTransfer(selectedSales);
+                }
+                setMeetingDate("");
+                setMeetingNotes("");
+                setSelectedSales("");
+              } catch(e) {}
+            }}
+            className="btn-primary w-full text-sm py-3 mt-4 bg-indigo-600 hover:bg-indigo-500"
+          >
+            حفظ البيانات وتحويل العميل
+          </button>
+        </div>
+      )}
+
+      {mode === "details" && (
+        <div className="space-y-6">
+          <div className="bg-[#182032] border border-white/5 rounded-2xl p-6">
+            <h3 className="text-lg font-bold text-accent-soft mb-6 flex items-center gap-2">
+              <span>📋</span> سجل الأنشطة (History)
+            </h3>
+            
+            {lead.activities && lead.activities.length > 0 ? (
+              <div className="relative border-r-2 border-white/10 pr-6 space-y-6">
+                {lead.activities.map((a) => (
+                  <div key={a.id} className="relative">
+                    <span className="absolute -right-[31px] top-1.5 w-3.5 h-3.5 rounded-full bg-indigo-500 ring-4 ring-[#0f1523]"></span>
+                    <div className="bg-[#121826] border border-white/5 rounded-xl p-4 shadow-sm hover:border-white/10 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
+                        <span className="text-sm font-bold text-indigo-400">{a.user?.name || "النظام"}</span>
+                        <span className="text-xs font-medium text-slate-500 bg-white/5 px-2 py-1 rounded-md" dir="ltr">{formatDateTime(a.createdAt)}</span>
+                      </div>
+                      <p className="text-sm text-slate-300 leading-relaxed">{a.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-sm text-slate-500">لا يوجد سجل أنشطة حتى الآن</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

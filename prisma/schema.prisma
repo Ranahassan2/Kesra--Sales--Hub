@@ -1,0 +1,190 @@
+// ============================================================
+// TeleSales CRM — Prisma Schema
+// Roles: ADMIN, HEAD_OF_SALES, TELE_SALES, SALES
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // For local/demo use: "sqlite". For production, switch to postgresql
+  // and set DATABASE_URL to your Postgres connection string.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  username      String   @unique
+  passwordHash  String
+  role          String
+  isActive      Boolean  @default(true)
+  lastActiveAt  DateTime?
+  phone         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Leads currently assigned to this user (as tele-sales or sales owner)
+  assignedLeads Lead[]        @relation("AssignedTo")
+  createdLeads  Lead[]        @relation("CreatedBy")
+  followUps     FollowUp[]
+  meetings      Meeting[]
+  activities    Activity[]
+  uploadBatches UploadBatch[]
+  notifications Notification[]
+
+  @@index([role])
+}
+
+model Lead {
+  id             String     @id @default(cuid())
+  name           String
+  phone          String
+  email          String?
+  company        String?
+  need           String? // احتياج العميل
+  interestReason String? // سبب اهتمامه
+  notes          String?
+  storeUrl       String? // لينك متجر العميل
+  socialMediaUrl String? // رابط السوشيال ميديا
+
+  status String @default("NEW")
+  tier String   @default("LEAD")
+  source String @default("MANUAL")
+
+  // Ownership — moves from Tele-Sales owner to Sales owner on transfer
+  assignedToId String?
+  assignedTo   User?   @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  // Stage owner type, useful for filtering "who currently owns this"
+  currentStage String @default("TELE_SALES")
+
+  createdById String
+  createdBy   User   @relation("CreatedBy", fields: [createdById], references: [id])
+
+  uploadBatchId String?
+  uploadBatch   UploadBatch? @relation(fields: [uploadBatchId], references: [id])
+
+  transferredAt DateTime?
+  closedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  followUps  FollowUp[]
+  meetings   Meeting[]
+  activities Activity[]
+
+  @@index([assignedToId])
+  @@index([status])
+  @@index([tier])
+  @@index([currentStage])
+}
+
+// A follow-up scheduled by a Tele-Sales or Sales employee
+model FollowUp {
+  id     String @id @default(cuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  scheduledDate DateTime?
+  notes         String?
+  details       String?
+
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([scheduledDate])
+  @@index([isCompleted])
+}
+
+model Meeting {
+  id     String @id @default(cuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  // The Sales (or Tele-Sales, before transfer) employee who owns the meeting
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  scheduledAt DateTime
+  status String @default("SCHEDULED")
+
+  result String? // نتيجة الـ Meeting
+  notes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([ownerId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+// Full audit trail — every action on a lead, visible to Admin/Head of Sales
+model Activity {
+  id     String @id @default(cuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  type String
+  message String
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([createdAt])
+}
+
+// Records each Excel/CSV upload — for traceability of bulk distribution
+model UploadBatch {
+  id         String   @id @default(cuid())
+  fileName   String
+  totalLeads Int
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+  createdAt  DateTime @default(now())
+
+  leads Lead[]
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("INFO")
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
