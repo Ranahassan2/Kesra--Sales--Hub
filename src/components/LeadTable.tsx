@@ -98,6 +98,7 @@ export default function LeadTable({
   canDelete,
   salesTeam,
   employees,
+  isSalesView,
 }: {
   leads: LeadRow[];
   showAssignee?: boolean;
