@@ -48,6 +48,12 @@ export default function UserManagementTable({
   const [file, setFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<string | null>(null);
 
+  const [toast, setToast] = useState<{ text: string, type: 'error' | 'success' } | null>(null);
+  const showToast = (text: string, type: 'error' | 'success' = 'error') => {
+    setToast({ text, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredUsers = users.filter((u) => 
@@ -68,7 +74,7 @@ export default function UserManagementTable({
       if (!res.ok) throw new Error(data.error ?? "حدث خطأ");
       router.refresh();
     } catch (e: any) {
-      alert(e.message);
+      showToast(e.message);
     } finally {
       setBusy(false);
     }
@@ -87,7 +93,7 @@ export default function UserManagementTable({
       setMenuOpenId(null);
       router.refresh();
     } catch (e: any) {
-      alert(e.message);
+      showToast(e.message);
     } finally {
       setBusy(false);
     }
@@ -146,6 +152,16 @@ export default function UserManagementTable({
 
   return (
     <div className="space-y-4">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-[100] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300 border ${
+          toast.type === 'error' ? 'bg-rose-950/90 text-rose-200 border-rose-500/30' : 'bg-emerald-950/90 text-emerald-200 border-emerald-500/30'
+        }`}>
+          <span className="text-xl">{toast.type === 'error' ? '⚠️' : '✅'}</span>
+          <p className="font-semibold">{toast.text}</p>
+        </div>
+      )}
+
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="relative w-full md:max-w-md">

@@ -171,7 +171,10 @@ export default function LeadTable({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setWaModalOpen(false);
-      alert("تم إرسال الرسالة بنجاح 🚀");
+      // Wait, since this is in CustomerDetailClient, we don't have showToast. 
+      // But we can just use setWaSendError or a small state.
+      // We will pass showToast down as a prop if we want.
+      setWaSendError("تم إرسال الرسالة بنجاح ✓");
     } catch(e:any) {
       setWaSendError(e.message || "خطأ في الإرسال");
     } finally {
@@ -200,6 +203,13 @@ export default function LeadTable({
   const [showAddModal, setShowAddModal] = useState(false);
   const [newLead, setNewLead] = useState({ name: "", phone: "", company: "", need: "" });
 
+  const [toast, setToast] = useState<{ text: string, type: 'error' | 'success' } | null>(null);
+
+  const showToast = (text: string, type: 'error' | 'success' = 'error') => {
+    setToast({ text, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   async function call(url: string, method: string, body?: any) {
     setBusy(true);
     try {
@@ -216,7 +226,7 @@ export default function LeadTable({
       }
       return data;
     } catch (e: any) {
-      alert(e.message);
+      showToast(e.message, 'error');
       throw e;
     } finally {
       setBusy(false);
@@ -224,7 +234,7 @@ export default function LeadTable({
   }
 
   async function handleAddLead() {
-    if (!newLead.name || !newLead.phone) return alert("الاسم ورقم الهاتف مطلوبين");
+    if (!newLead.name || !newLead.phone) return showToast("الاسم ورقم الهاتف مطلوبين");
     await call("/api/leads", "POST", newLead);
     setShowAddModal(false);
     setNewLead({ name: "", phone: "", company: "", need: "" });
@@ -304,6 +314,16 @@ export default function LeadTable({
 
   return (
     <div className="w-full">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-[100] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300 border ${
+          toast.type === 'error' ? 'bg-rose-950/90 text-rose-200 border-rose-500/30' : 'bg-emerald-950/90 text-emerald-200 border-emerald-500/30'
+        }`}>
+          <span className="text-xl">{toast.type === 'error' ? '⚠️' : '✅'}</span>
+          <p className="font-semibold">{toast.text}</p>
+        </div>
+      )}
+
       {/* Header & Controls */}
       <div className="flex flex-col gap-4 mb-6 mt-4">
         {/* Title & Count */}
@@ -788,6 +808,7 @@ function LeadActions({
 }) {
   const [followUpDate, setFollowUpDate] = useState("");
   const [followUpNotes, setFollowUpNotes] = useState("");
+  const [transferError, setTransferError] = useState("");
   const [meetingDate, setMeetingDate] = useState("");
   const [meetingNotes, setMeetingNotes] = useState("");
   const [selectedSales, setSelectedSales] = useState("");
@@ -1151,11 +1172,18 @@ function LeadActions({
             />
           </div>
 
+          {transferError && (
+            <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl mt-4">
+              {transferError}
+            </div>
+          )}
+
           <button
             disabled={busy}
             onClick={async () => {
+              setTransferError("");
               if (!meetingDate && !selectedSales) {
-                alert("يرجى إدخال الموعد أو اختيار موظف المبيعات أولاً");
+                setTransferError("يرجى إدخال الموعد أو اختيار موظف المبيعات أولاً");
                 return;
               }
               try {
