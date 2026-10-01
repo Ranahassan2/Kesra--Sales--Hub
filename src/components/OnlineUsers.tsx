@@ -16,7 +16,7 @@ const ROLE_LABELS: Record<string, string> = {
   SALES: "موظف Sales",
 };
 
-export default function OnlineUsers() {
+export default function OnlineUsers({ currentUserRole }: { currentUserRole?: string }) {
   const [users, setUsers] = useState<OnlineUser[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -44,7 +44,14 @@ export default function OnlineUsers() {
       const res = await fetch(`/api/users/online?t=${new Date().getTime()}`);
       if (res.ok) {
         const data = await res.json();
-        setUsers(data.onlineUsers || []);
+        let fetchedUsers = data.onlineUsers || [];
+        
+        // إذا كان الموظف تيلي سيلز، اعرض له موظفين السيلز المتصلين فقط (عشان يعرف يحولهم العملاء)
+        if (currentUserRole === "TELE_SALES") {
+          fetchedUsers = fetchedUsers.filter((u: any) => u.role === "SALES");
+        }
+        
+        setUsers(fetchedUsers);
       }
     } catch (e) {
       console.error(e);

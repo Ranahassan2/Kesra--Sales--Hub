@@ -40,7 +40,7 @@ export default async function DashboardShell({
 
             <div className="hidden sm:flex items-center">
               <ChatBox />
-              <OnlineUsers />
+              <OnlineUsers currentUserRole={role} />
               <NotificationBell />
             </div>
           </div>
