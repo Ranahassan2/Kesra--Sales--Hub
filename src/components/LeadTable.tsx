@@ -818,6 +818,21 @@ function LeadActions({
 
   const pendingFollowUps = (lead.followUps ?? []).filter((f) => !f.isCompleted);
 
+  const [onlineSalesIds, setOnlineSalesIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (mode === "transfer" && allowTransfer) {
+      fetch('/api/users/online?t=' + Date.now())
+        .then(res => res.json())
+        .then(data => {
+          if (data.onlineUsers) {
+            setOnlineSalesIds(data.onlineUsers.map((u: any) => u.id));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [mode, allowTransfer]);
+
   return (
     <div className="space-y-6">
       {mode === "edit" && (
@@ -1099,12 +1114,13 @@ function LeadActions({
             >
               <option value="">اختر موظف Sales</option>
               {salesTeam?.map((s) => {
-                let dot = "⚫";
-                if (s.lastActiveAt) {
-                  const diffMinutes = (Date.now() - new Date(s.lastActiveAt).getTime()) / 1000 / 60;
-                  if (diffMinutes < 10) dot = "🟢";
-                  else if (diffMinutes < 60) dot = "🟡";
+                // If they are in the live online list, show green, else if they have a very recent static lastActiveAt show yellow, else grey
+                let dot = onlineSalesIds.includes(s.id) ? "🟢" : "⚫";
+                if (dot === "⚫" && s.lastActiveAt) {
+                  const diff = (Date.now() - new Date(s.lastActiveAt).getTime()) / 1000 / 60;
+                  if (diff < 60) dot = "🟡";
                 }
+
                 return (
                   <option key={s.id} value={s.id}>
                     {dot} {s.name}
