@@ -18,8 +18,14 @@ export async function GET(
   try {
     const client = getWaClient();
     const chatId = decodeURIComponent(params.chatId);
-    const chat = await client!.getChatById(chatId);
-    const messages = await chat.fetchMessages({ limit: 50 });
+    let messages: any[] = [];
+    try {
+      const chat = await client!.getChatById(chatId);
+      messages = await chat.fetchMessages({ limit: 50 });
+    } catch {
+      // Chat might not exist yet if it's a new number
+      return NextResponse.json({ messages: [] });
+    }
 
     const msgData = messages.map((m) => ({
       id: m.id._serialized,

@@ -93,7 +93,12 @@ export default function WhatsAppInboxClient() {
   // Handle auto-selecting chat from URL
   useEffect(() => {
     if (phoneQuery && chats.length > 0 && !selectedChat) {
-      const formatted = phoneQuery.replace(/[^0-9]/g, "");
+      let formatted = phoneQuery.replace(/[^0-9]/g, "");
+      // Add country code for Egypt numbers if missing
+      if (formatted.startsWith("01") && formatted.length === 11) {
+        formatted = "2" + formatted;
+      }
+      
       // Look for a chat that contains this number
       const matchingChat = chats.find(c => c.id.includes(formatted));
       
@@ -134,16 +139,36 @@ export default function WhatsAppInboxClient() {
 
   const handleSend = async () => {
     if (!selectedChat || !newMsg.trim()) return;
+    
+    // Optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: Message = {
+      id: tempId,
+      body: newMsg,
+      fromMe: true,
+      timestamp: Math.floor(Date.now() / 1000),
+      type: "chat"
+    };
+    
+    setMessages(prev => [...prev, optimisticMsg]);
+    const messageToSend = newMsg;
+    setNewMsg("");
     setSending(true);
+
     try {
       await fetch(`/api/whatsapp/chats/${encodeURIComponent(selectedChat.id)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: newMsg }),
+        body: JSON.stringify({ message: messageToSend }),
       });
-      setNewMsg("");
+      // The background poll will re-fetch the correct messages
       await loadMessages();
-    } catch {} finally { setSending(false); }
+    } catch {
+      // Revert if failed (optional, but good UX)
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+    } finally { 
+      setSending(false); 
+    }
   };
 
   const filtered = chats.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
