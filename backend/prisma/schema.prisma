@@ -5,6 +5,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -58,6 +59,8 @@ model Lead {
   need           String? // احتياج العميل
   interestReason String? // سبب اهتمامه
   notes          String?
+  storeUrl       String? // رابط المتجر (أو أكثر، مفصولة بفاصلة)
+  socialMediaUrl String? // رابط السوشيال ميديا (أو أكثر، مفصولة بفاصلة)
 
   status String @default("NEW")
   tier String   @default("LEAD")

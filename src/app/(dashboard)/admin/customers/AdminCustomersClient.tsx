@@ -38,13 +38,40 @@ export default function AdminCustomersClient({
   const [assignTarget, setAssignTarget] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
+  // Custom Modal State
+  const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: "alert" | "confirm"; onConfirm?: () => void }>({ isOpen: false, title: "", message: "", type: "alert" });
+  
+  const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: "alert" });
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => setModal({ isOpen: true, title, message, type: "confirm", onConfirm });
+
   const [search, setSearch] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Parse Excel
+  // Upload Preview State
+  const [previewData, setPreviewData] = useState<{
+    fileName: string;
+    rawJson: any[];
+    allKeys: string[];
+    nameKey: string;
+    phoneKey: string;
+    companyKey: string;
+    needKey: string;
+    mappedLeads: { name: string; phone: string; company: string; need: string }[];
+  } | null>(null);
+  const [previewNameKey, setPreviewNameKey] = useState("");
+  const [previewPhoneKey, setPreviewPhoneKey] = useState("");
+  const [previewCompanyKey, setPreviewCompanyKey] = useState("");
+  const [previewNeedKey, setPreviewNeedKey] = useState("");
+  const [previewStoreUrlKey, setPreviewStoreUrlKey] = useState("");
+  const [previewSocialKey, setPreviewSocialKey] = useState("");
+  const [previewEmailKey, setPreviewEmailKey] = useState("");
+  const [previewTier, setPreviewTier] = useState("WARM");
+
+  // Parse Excel -> Show Preview
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -58,35 +85,59 @@ export default function AdminCustomersClient({
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         
-        // Convert to JSON
         const rawJson: any[] = XLSX.utils.sheet_to_json(sheet);
-        
-        // Map to expected fields (assuming Arabic headers or English)
-        const mappedLeads = rawJson.map(row => ({
-          name: row["الاسم"] || row["اسم العميل"] || row["Name"] || row["name"] || "",
-          phone: String(row["رقم الهاتف"] || row["التليفون"] || row["Phone"] || row["phone"] || ""),
-          company: row["الشركة"] || row["Company"] || row["company"] || "",
-          need: row["الاحتياج"] || row["الملاحظات"] || row["Need"] || row["Notes"] || "",
-        })).filter(l => l.name && l.phone); // Filter out invalid rows
-
-        if (mappedLeads.length === 0) {
-          alert("لم يتم العثور على بيانات صالحة في الملف. يرجى التأكد من وجود أعمدة (الاسم) و (رقم الهاتف).");
+        if (rawJson.length === 0) {
+          showAlert("خطأ", "الملف فارغ أو لا يحتوي على بيانات.");
           setIsUploading(false);
           return;
         }
 
-        const res = await fetch("/api/admin/leads/bulk-upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ leads: mappedLeads }),
-        });
-
-        if (!res.ok) throw new Error(await res.text());
+        const sampleRow = rawJson[0];
+        const keys = Object.keys(sampleRow);
         
-        alert(`تم رفع ${mappedLeads.length} عميل بنجاح!`);
-        router.refresh();
+        const findKey = (keywords: string[]) => keys.find(k => 
+          keywords.some(kw => k.toLowerCase().includes(kw.toLowerCase()))
+        );
+
+        let nameKey = findKey(["اسم", "name", "عميل", "client"]) || "";
+        let phoneKey = findKey(["هاتف", "تليفون", "phone", "موبايل", "mobile", "رقم الجوال", "جوال"]) || "";
+        let companyKey = findKey(["شرك", "company", "مؤسس"]) || "";
+        let needKey = findKey(["حتاج", "ملاحظ", "need", "note", "تفاصيل"]) || "";
+        let storeUrlKey = findKey(["متجر", "store", "موقع", "website", "link", "رابط"]) || "";
+        let socialKey = findKey(["سوشيال", "social", "انستا", "insta", "twitter", "تويتر", "facebook", "تيك توك", "tiktok"]) || "";
+        let emailKey = findKey(["email", "ايميل", "بريد"]) || "";
+
+        // Smarter Saudi phone detection: must be 9 digits starting with 5,
+        // OR 10 digits starting with 05, OR 12 digits starting with 966
+        if (!phoneKey) {
+          phoneKey = keys.find(k => {
+            const val = String(sampleRow[k] || "").trim().replace(/\D/g, "");
+            return (
+              (val.startsWith("5") && val.length === 9) ||
+              (val.startsWith("05") && val.length === 10) ||
+              (val.startsWith("966") && val.length === 12)
+            );
+          }) || "";
+        }
+
+        if (!nameKey) {
+          nameKey = keys.find(k => 
+            k !== phoneKey && k !== companyKey && k !== needKey && isNaN(Number(sampleRow[k])) && String(sampleRow[k] || "").length > 2
+          ) || "";
+        }
+
+        // Build preview
+        setPreviewData({ fileName: file.name, rawJson, allKeys: keys, nameKey, phoneKey, companyKey, needKey, mappedLeads: [] });
+        setPreviewNameKey(nameKey);
+        setPreviewPhoneKey(phoneKey);
+        setPreviewCompanyKey(companyKey);
+        setPreviewNeedKey(needKey);
+        setPreviewStoreUrlKey(storeUrlKey);
+        setPreviewSocialKey(socialKey);
+        setPreviewEmailKey(emailKey);
+
       } catch (error: any) {
-        alert("حدث خطأ أثناء رفع الملف: " + error.message);
+        showAlert("خطأ", "حدث خطأ أثناء قراءة الملف: " + error.message);
       } finally {
         setIsUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -95,10 +146,63 @@ export default function AdminCustomersClient({
     reader.readAsBinaryString(file);
   };
 
+  // Format phone as Saudi
+  const formatSaudiPhone = (raw: string) => {
+    let v = raw.replace(/\D/g, "");
+    if (v.startsWith("05")) return "966" + v.substring(1);
+    if (v.startsWith("5") && v.length === 9) return "966" + v;
+    if (v.startsWith("966")) return v;
+    if (v.startsWith("0")) return "966" + v.substring(1);
+    return "966" + v;
+  };
+
+  // Actually upload after user confirms preview
+  const handleConfirmUpload = async () => {
+    if (!previewData) return;
+    const { rawJson, fileName } = previewData;
+
+    const mappedLeads = rawJson.map(row => {
+      const phoneVal = previewPhoneKey ? formatSaudiPhone(String(row[previewPhoneKey] || "").trim()) : "";
+      return {
+        name: previewNameKey ? String(row[previewNameKey] || "").trim() : "",
+        phone: phoneVal,
+        company: previewCompanyKey ? String(row[previewCompanyKey] || "").trim() : "",
+        need: previewNeedKey ? String(row[previewNeedKey] || "").trim() : "",
+        storeUrl: previewStoreUrlKey ? String(row[previewStoreUrlKey] || "").trim() : "",
+        socialMediaUrl: previewSocialKey ? String(row[previewSocialKey] || "").trim() : "",
+        email: previewEmailKey ? String(row[previewEmailKey] || "").trim() : "",
+      };
+    }).filter(l => l.name && l.phone && l.phone.length >= 11);
+
+    if (mappedLeads.length === 0) {
+      showAlert("خطأ في البيانات", "لم يتم العثور على بيانات صالحة. تأكد من اختيار الأعمدة الصحيحة.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const res = await fetch("/api/admin/leads/bulk-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: mappedLeads, fileName, tier: previewTier }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      
+      setPreviewData(null);
+      showAlert("تم بنجاح", `تم رفع ${mappedLeads.length} عميل بنجاح!`);
+      router.refresh();
+    } catch (error: any) {
+      showAlert("خطأ", "حدث خطأ أثناء الرفع: " + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+
   // Bulk Assign
   const handleBulkAssign = async () => {
-    if (selectedLeads.size === 0) return alert("يرجى تحديد العملاء أولاً.");
-    if (!assignTarget) return alert("يرجى اختيار الموظف.");
+    if (selectedLeads.size === 0) return showAlert("تنبيه", "يرجى تحديد العملاء أولاً.");
+    if (!assignTarget) return showAlert("تنبيه", "يرجى اختيار الموظف.");
 
     setIsAssigning(true);
     try {
@@ -113,15 +217,42 @@ export default function AdminCustomersClient({
 
       if (!res.ok) throw new Error(await res.text());
       
-      alert(`تم تحويل ${selectedLeads.size} عميل للموظف بنجاح!`);
+      showAlert("تم بنجاح", `تم تحويل ${selectedLeads.size} عميل للموظف بنجاح!`);
       setSelectedLeads(new Set());
       setAssignTarget("");
       router.refresh();
     } catch (error: any) {
-      alert("حدث خطأ أثناء التحويل: " + error.message);
+      showAlert("خطأ", "حدث خطأ أثناء التحويل: " + error.message);
     } finally {
       setIsAssigning(false);
     }
+  };
+
+  // Bulk Delete
+  const handleBulkDelete = () => {
+    if (selectedLeads.size === 0) return showAlert("تنبيه", "يرجى تحديد العملاء أولاً.");
+    
+    showConfirm("تأكيد الحذف", `هل أنت متأكد من حذف ${selectedLeads.size} عميل بشكل نهائي؟`, async () => {
+      setIsDeleting(true);
+      try {
+        const res = await fetch("/api/admin/leads/bulk-delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadIds: Array.from(selectedLeads) }),
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        
+        showAlert("تم بنجاح", `تم حذف العملاء بنجاح!`);
+        setSelectedLeads(new Set());
+        router.refresh();
+        setLeads(leads.filter(l => !selectedLeads.has(l.id)));
+      } catch (error: any) {
+        showAlert("خطأ", "حدث خطأ أثناء الحذف: " + error.message);
+      } finally {
+        setIsDeleting(false);
+      }
+    });
   };
 
   const toggleSelectAll = (filteredList: Lead[]) => {
@@ -159,7 +290,165 @@ export default function AdminCustomersClient({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Custom Modal */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#182032] border border-white/10 p-6 rounded-2xl shadow-2xl max-w-md w-full transform transition-all scale-100 opacity-100">
+            <h3 className={`text-xl font-bold mb-3 ${modal.title.includes("خطأ") ? "text-rose-500" : modal.title.includes("بنجاح") ? "text-emerald-500" : "text-white"}`}>
+              {modal.title}
+            </h3>
+            <p className="text-slate-300 text-[15px] mb-8 leading-relaxed">
+              {modal.message}
+            </p>
+            <div className="flex justify-end gap-3">
+              {modal.type === "confirm" && (
+                <button 
+                  onClick={() => setModal({ ...modal, isOpen: false })}
+                  className="px-5 py-2 rounded-xl text-sm font-bold text-slate-300 bg-white/5 hover:bg-white/10 transition-colors"
+                >
+                  إلغاء
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  if (modal.type === "confirm" && modal.onConfirm) modal.onConfirm();
+                  setModal({ ...modal, isOpen: false });
+                }}
+                className={`px-6 py-2 rounded-xl text-sm font-bold text-white transition-colors shadow-lg ${
+                  modal.type === "confirm" ? "bg-rose-600 hover:bg-rose-500" : "bg-indigo-600 hover:bg-indigo-500"
+                }`}
+              >
+                {modal.type === "confirm" ? "نعم، متأكد" : "حسناً"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Preview Modal */}
+      {previewData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#182032] border border-white/10 p-6 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <span className="text-amber-400">🔍</span> معاينة الشيت قبل الرفع
+              </h3>
+              <button
+                onClick={() => setPreviewData(null)}
+                className="text-rose-500 hover:text-white hover:bg-rose-600 transition-colors p-1.5 rounded-lg border border-rose-500/30 hover:border-rose-600 shrink-0"
+                title="إغلاق"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            <p className="text-slate-400 text-sm mb-5">
+              السيستم اكتشف الأعمدة تلقائياً. تحقق من اختيار الأعمدة الصحيحة قبل الرفع.
+            </p>
+
+            {/* Column Mapping Selectors */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+              {[
+                { label: "عمود الاسم *", value: previewNameKey, setter: setPreviewNameKey, color: "indigo" },
+                { label: "عمود التليفون *", value: previewPhoneKey, setter: setPreviewPhoneKey, color: "emerald" },
+                { label: "عمود الإيميل", value: previewEmailKey, setter: setPreviewEmailKey, color: "cyan" },
+                { label: "عمود الشركة", value: previewCompanyKey, setter: setPreviewCompanyKey, color: "sky" },
+                { label: "عمود الملاحظات / الاحتياج", value: previewNeedKey, setter: setPreviewNeedKey, color: "violet" },
+                { label: "عمود رابط المتجر / الموقع", value: previewStoreUrlKey, setter: setPreviewStoreUrlKey, color: "amber" },
+                { label: "عمود السوشيال ميديا", value: previewSocialKey, setter: setPreviewSocialKey, color: "rose" },
+              ].map(({ label, value, setter, color }) => (
+                <div key={label}>
+                  <label className={`block text-xs font-bold mb-1 text-${color}-400`}>{label}</label>
+                  <select
+                    value={value}
+                    onChange={e => setter(e.target.value)}
+                    className="w-full bg-[#0f1523] border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50"
+                  >
+                    <option value="">-- لا يوجد --</option>
+                    {previewData.allKeys.map(k => (
+                      <option key={k} value={k}>{k}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+
+            {/* Tier Picker */}
+            <div className="mb-6 bg-[#0f1523] rounded-xl p-4 border border-white/5">
+              <p className="text-xs font-bold text-slate-400 mb-3">حالة العملاء بعد الرفع (Tier)</p>
+              <div className="flex gap-3">
+                {[
+                  { value: "HOT", label: "🔥 Hot", bg: "bg-rose-500/20 border-rose-500/40 text-rose-400", active: "bg-rose-500 text-white border-rose-500" },
+                  { value: "WARM", label: "🌡️ Warm", bg: "bg-amber-500/20 border-amber-500/40 text-amber-400", active: "bg-amber-500 text-white border-amber-500" },
+                  { value: "COLD", label: "❄️ Cold", bg: "bg-sky-500/20 border-sky-500/40 text-sky-400", active: "bg-sky-500 text-white border-sky-500" },
+                ].map(t => (
+                  <button
+                    key={t.value}
+                    onClick={() => setPreviewTier(t.value)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${previewTier === t.value ? t.active : t.bg}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Data Preview Table */}
+            <div className="rounded-xl border border-white/10 overflow-hidden mb-6">
+              <div className="bg-[#0f1523] px-4 py-2 text-xs font-bold text-slate-400 border-b border-white/5">
+                معاينة أول 5 صفوف من البيانات
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-right">
+                  <thead className="bg-[#0a0f1a]">
+                    <tr>
+                      <th className="px-3 py-2 text-indigo-400 font-bold">الاسم</th>
+                      <th className="px-3 py-2 text-emerald-400 font-bold">التليفون</th>
+                      <th className="px-3 py-2 text-sky-400 font-bold">الشركة</th>
+                      <th className="px-3 py-2 text-violet-400 font-bold">الملاحظات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.rawJson.slice(0, 5).map((row, i) => {
+                      const phone = previewPhoneKey ? String(row[previewPhoneKey] || "") : "";
+                      return (
+                        <tr key={i} className="border-t border-white/5">
+                          <td className="px-3 py-2 text-white font-medium">{previewNameKey ? String(row[previewNameKey] || "-") : "-"}</td>
+                          <td className="px-3 py-2 text-slate-300" dir="ltr">{phone || "-"}</td>
+                          <td className="px-3 py-2 text-slate-400">{previewCompanyKey ? String(row[previewCompanyKey] || "-") : "-"}</td>
+                          <td className="px-3 py-2 text-slate-500">{previewNeedKey ? String(row[previewNeedKey] || "-") : "-"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <p className="text-slate-500 text-xs mb-5">إجمالي الصفوف في الملف: <span className="text-white font-bold">{previewData.rawJson.length} سطر</span></p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setPreviewData(null)}
+                className="px-5 py-2 rounded-xl text-sm font-bold text-slate-300 bg-white/5 hover:bg-white/10 transition-colors"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleConfirmUpload}
+                disabled={isUploading || !previewNameKey || !previewPhoneKey}
+                className="px-6 py-2 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-lg disabled:opacity-50 flex items-center gap-2"
+              >
+                {isUploading ? "جاري الرفع..." : `✅ رفع ${previewData.rawJson.length} عميل`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header & Upload */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#121826] p-6 rounded-3xl border border-white/5 shadow-xl">
         <div>
@@ -275,6 +564,17 @@ export default function AdminCustomersClient({
           >
             {isAssigning ? "جاري..." : "توزيع"}
           </button>
+          
+          {canDelete && (
+            <button 
+              onClick={handleBulkDelete}
+              disabled={isDeleting || selectedLeads.size === 0}
+              className="bg-rose-500/10 hover:bg-rose-600 text-rose-500 hover:text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors disabled:opacity-50 whitespace-nowrap border border-rose-500/20 ml-2"
+              title="حذف العملاء المحددين"
+            >
+              {isDeleting ? "..." : "حذف"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -353,6 +653,7 @@ export default function AdminCustomersClient({
           allowTransfer
           canDelete={canDelete}
           salesTeam={salesTeam as any}
+          employees={employees as any}
         />
       )}
     </div>

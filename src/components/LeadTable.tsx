@@ -89,12 +89,14 @@ export default function LeadTable({
   allowTransfer,
   canDelete,
   salesTeam,
+  employees,
 }: {
   leads: LeadRow[];
   showAssignee?: boolean;
   allowTransfer?: boolean;
   canDelete?: boolean;
   salesTeam?: SalesOption[];
+  employees?: { id: string; name: string; role: string }[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -149,7 +151,18 @@ export default function LeadTable({
     setWaSending(true);
     setWaSendError("");
     try {
-      const phone = waTargetPhone.startsWith("0") ? "2" + waTargetPhone : waTargetPhone;
+      let phone = waTargetPhone.replace(/\\D/g, "");
+      // Format Saudi Numbers (966)
+      if (phone.startsWith("05")) {
+        phone = "966" + phone.substring(1);
+      } else if (phone.startsWith("5") && phone.length === 9) {
+        phone = "966" + phone;
+      } else if (!phone.startsWith("966")) {
+        // Fallback for other numbers, just ensure it doesn't fail
+        if (phone.startsWith("0")) phone = "966" + phone.substring(1);
+        else phone = "966" + phone;
+      }
+
       const res = await fetch("/api/whatsapp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -168,6 +181,7 @@ export default function LeadTable({
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [filterAssignee, setFilterAssignee] = useState<string>("ALL");
 
   useEffect(() => {
     const q = searchParams.get("search");
@@ -244,6 +258,14 @@ export default function LeadTable({
       list = list.filter((l) => l.status === filterStatus);
     }
 
+    if (filterAssignee !== "ALL") {
+      if (filterAssignee === "UNASSIGNED") {
+        list = list.filter((l) => !l.assignedTo);
+      } else {
+        list = list.filter((l) => l.assignedTo?.id === filterAssignee);
+      }
+    }
+
     const now = new Date();
     if (dateFilter === "NEW_LEADS") {
       list = list.filter((l) => {
@@ -267,7 +289,7 @@ export default function LeadTable({
         .filter(Boolean)
         .some((field) => field!.toLowerCase().includes(q))
     );
-  }, [leads, search, filterStatus, dateFilter]);
+  }, [leads, search, filterStatus, filterAssignee, dateFilter]);
 
   const AVATAR_COLORS = [
     "bg-indigo-500", "bg-blue-500", "bg-emerald-500", "bg-orange-400", "bg-pink-500", "bg-yellow-500", "bg-purple-500"
@@ -331,6 +353,28 @@ export default function LeadTable({
                 </div>
               </div>
 
+              {/* Employee Filter */}
+              {employees && employees.length > 0 && (
+                <div className="relative w-full md:w-48">
+                  <select
+                    value={filterAssignee}
+                    onChange={(e) => setFilterAssignee(e.target.value)}
+                    className="w-full bg-[#1e293b] border border-slate-700/50 text-slate-200 text-base rounded-xl pl-4 pr-10 py-3.5 outline-none shadow-sm hover:border-slate-600 transition-colors appearance-none cursor-pointer"
+                  >
+                    <option value="ALL">كل الموظفين</option>
+                    <option value="UNASSIGNED">غير معين (جديد)</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.role === "TELE_SALES" ? "تيلي" : "سيلز"})</option>
+                    ))}
+                  </select>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </div>
+                </div>
+              )}
+
               {/* Sort Dropdown */}
               <select 
                 value={dateFilter}
@@ -370,16 +414,16 @@ export default function LeadTable({
             const avatarColor = getAvatarColor(lead.id);
 
             return (
-              <div key={lead.id} className="bg-[#121826] rounded-2xl p-5 flex flex-col gap-4 relative border border-white/5 hover:border-white/10 transition-colors shadow-lg group">
+              <div key={lead.id} className="bg-[#121826] rounded-2xl p-5 flex flex-col gap-4 relative border border-white/5 hover:border-white/10 transition-colors shadow-lg group overflow-hidden">
                 {/* Header */}
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
                     <div className={`w-12 h-12 shrink-0 rounded-full ${avatarColor} flex items-center justify-center text-white text-xl shadow-inner`}>
                       👤
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-white truncate text-[15px]">{lead.name}</h3>
-                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{lead.company || "—"}</p>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <h3 className="font-bold text-white text-[15px] truncate" title={lead.name}>{lead.name}</h3>
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate" title={lead.company || ""}>{lead.company || "—"}</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2.5">
