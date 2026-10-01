@@ -45,6 +45,7 @@ export interface LeadRow {
   storeUrl?: string | null;
   socialMediaUrl?: string | null;
   status: string;
+  salesStatus: string;
   tier: string;
   assignedTo: { id: string; name: string; role: string } | null;
   currentStage: string;
@@ -515,7 +516,7 @@ export default function LeadTable({
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-row-reverse">
-                      <StatusBadge status={lead.status} />
+                      <StatusBadge status={isSalesView ? lead.salesStatus : lead.status} />
                       <TierBadge tier={lead.tier} />
                     </div>
                     <div className="flex flex-col items-end gap-1.5 mt-1">
@@ -1094,7 +1095,7 @@ function LeadActions({
           <p className="text-sm font-semibold text-slate-400 mb-2">أكشن مع العميل</p>
           <select
             disabled={busy}
-            defaultValue={lead.status}
+            defaultValue={isSalesView ? lead.salesStatus : lead.status}
             onChange={(e) => onStatus(e.target.value)}
             className="input-field text-sm py-3 w-full"
           >
@@ -1113,7 +1114,7 @@ function LeadActions({
             <p className="text-sm font-semibold text-slate-400">تحديث الحالة</p>
             <select
               disabled={busy}
-              defaultValue={lead.status}
+              defaultValue={isSalesView ? lead.salesStatus : lead.status}
               onChange={(e) => onStatus(e.target.value)}
               className="input-field text-sm py-3 w-full"
             >

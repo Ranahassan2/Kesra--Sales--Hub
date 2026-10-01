@@ -37,10 +37,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
+  const isSales = session.user.role === Role.SALES;
+
   const updated = await prisma.lead.update({
     where: { id: params.id },
     data: {
-      ...(parsed.data.status && { status: parsed.data.status }),
+      ...(parsed.data.status && (isSales ? { salesStatus: parsed.data.status } : { status: parsed.data.status })),
       ...(parsed.data.tier && { tier: parsed.data.tier }),
       ...(parsed.data.status === "CLOSED_WON" || parsed.data.status === "CLOSED_LOST"
         ? { closedAt: new Date() }

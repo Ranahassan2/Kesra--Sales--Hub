@@ -63,9 +63,10 @@ model Lead {
   storeUrl       String? // رابط المتجر (أو أكثر، مفصولة بفاصلة)
   socialMediaUrl String? // رابط السوشيال ميديا (أو أكثر، مفصولة بفاصلة)
 
-  status String @default("NEW")
-  tier String   @default("LEAD")
-  source String @default("MANUAL")
+  status       String @default("NEW") // حالة التيلي سيلز
+  salesStatus  String @default("NEW") // حالة المبيعات
+  tier         String @default("LEAD")
+  source       String @default("MANUAL")
 
   // Ownership — moves from Tele-Sales owner to Sales owner on transfer
   assignedToId String?

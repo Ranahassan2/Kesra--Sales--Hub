@@ -20,11 +20,11 @@ export default function SalesClient({ leads }: { leads: any[] }) {
     )
   );
 
-  const newLeads     = leads.filter(l => l.status === "NEW");
-  const noAnswerLeads = leads.filter(l => l.status === "NO_ANSWER" || l.status === "NOT_AVAILABLE");
-  const followupLeads = leads.filter(l => l.status === "NEEDS_FOLLOWUP");
-  const wonLeads     = leads.filter(l => l.status === "CLOSED_WON");
-  const lostLeads    = leads.filter(l => l.status === "CLOSED_LOST");
+  const newLeads        = leads.filter(l => l.salesStatus === "NEW");
+  const noAnswerLeads   = leads.filter(l => l.salesStatus === "NO_ANSWER" || l.salesStatus === "NOT_AVAILABLE");
+  const followupLeads   = leads.filter(l => l.salesStatus === "NEEDS_FOLLOWUP");
+  const wonLeads        = leads.filter(l => l.salesStatus === "CLOSED_WON");
+  const lostLeads       = leads.filter(l => l.salesStatus === "CLOSED_LOST");
 
   let displayedLeads = leads;
   if (activeTab === "new")           displayedLeads = newLeads;
