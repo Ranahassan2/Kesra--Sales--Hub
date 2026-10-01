@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import StatusBadge from "@/components/StatusBadge";
 import TierBadge from "@/components/TierBadge";
 
@@ -101,6 +102,70 @@ export default function LeadTable({
   const [modalMode, setModalMode] = useState<"edit" | "details" | "status" | "task" | "transfer">("details");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // WhatsApp modal
+  const [waModalOpen, setWaModalOpen] = useState(false);
+  const [waTargetPhone, setWaTargetPhone] = useState("");
+  const [waTargetName, setWaTargetName] = useState("");
+  const [waStatus, setWaStatus] = useState<"DISCONNECTED"|"INITIALIZING"|"QR_READY"|"CONNECTED">("DISCONNECTED");
+  const [waQr, setWaQr] = useState<string|null>(null);
+  const [waMessage, setWaMessage] = useState("");
+  const [waSending, setWaSending] = useState(false);
+  const [waSendError, setWaSendError] = useState("");
+
+  // Poll WhatsApp status when modal is open
+  useEffect(() => {
+    if (!waModalOpen) return;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/whatsapp/status?t=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setWaStatus(data.status);
+          setWaQr(data.qrCodeBase64);
+        }
+      } catch {}
+    };
+    poll();
+    const iv = setInterval(poll, 3000);
+    return () => clearInterval(iv);
+  }, [waModalOpen]);
+
+  const handleStartWa = async (phone: string, name: string) => {
+    setWaTargetPhone(phone);
+    setWaTargetName(name);
+    setWaMessage(`أهلاً بك يا ${name}، معك فريق كَسرة AI.`);
+    setWaSendError("");
+    setWaModalOpen(true);
+    // Trigger initialization if disconnected
+    const st = await fetch(`/api/whatsapp/status?t=${Date.now()}`).then(r=>r.json()).catch(()=>({}));
+    if (st.status === "DISCONNECTED") {
+      await fetch("/api/whatsapp/status", { method: "POST" });
+    }
+  };
+
+  const handleSendWaMessage = async () => {
+    if (!waMessage.trim()) return;
+    setWaSending(true);
+    setWaSendError("");
+    try {
+      const phone = waTargetPhone.startsWith("0") ? "2" + waTargetPhone : waTargetPhone;
+      const res = await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, message: waMessage }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setWaModalOpen(false);
+      alert("تم إرسال الرسالة بنجاح 🚀");
+    } catch(e:any) {
+      setWaSendError(e.message || "خطأ في الإرسال");
+    } finally {
+      setWaSending(false);
+    }
+  };
+
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
@@ -429,9 +494,7 @@ export default function LeadTable({
                 {/* Actions */}
                 <div className="mt-2 pt-4 flex gap-3 border-t border-white/[0.03]">
                   <a 
-                    href={`https://wa.me/${lead.phone.startsWith("0") ? "2" + lead.phone : lead.phone}`} 
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="/whatsapp-inbox"
                     className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 text-[13px] transition-colors text-center flex items-center justify-center gap-2 font-semibold shadow-[0_4px_12px_rgba(79,70,229,0.3)]"
                   >
                     واتساب 💬
@@ -446,6 +509,84 @@ export default function LeadTable({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* WhatsApp Internal Modal */}
+      {waModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-md p-4">
+          <div className="bg-[#0f1523] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="p-5 border-b border-white/10 flex justify-between items-center">
+              <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                <span className="text-green-400">💬</span> واتساب — {waTargetName}
+              </h3>
+              <button onClick={() => setWaModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">✕</button>
+            </div>
+
+            <div className="p-6">
+              {/* Disconnected — show connect button */}
+              {waStatus === "DISCONNECTED" && (
+                <div className="text-center py-6">
+                  <p className="text-slate-300 mb-4">الواتساب غير مرتبط. اضغط لتوليد رمز QR.</p>
+                  <button
+                    onClick={() => fetch("/api/whatsapp/status", { method: "POST" })}
+                    className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-xl transition-colors"
+                  >
+                    توليد رمز QR للربط
+                  </button>
+                </div>
+              )}
+
+              {/* Initializing */}
+              {waStatus === "INITIALIZING" && (
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 border-4 border-green-500/20 border-t-green-500 rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-green-400 font-bold">جاري تجهيز رمز QR... يرجى الانتظار</p>
+                  <p className="text-sm text-slate-400 mt-2">قد تستغرق بضع ثواني</p>
+                </div>
+              )}
+
+              {/* QR Ready */}
+              {waStatus === "QR_READY" && waQr && (
+                <div className="text-center">
+                  <p className="text-white font-bold mb-4">📱 امسح هذا الرمز من موبايلك</p>
+                  <div className="bg-white p-3 rounded-2xl inline-block mb-4 shadow-xl">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={waQr} alt="WhatsApp QR" width={220} height={220} />
+                  </div>
+                  <div className="text-right text-sm text-slate-300 space-y-2 bg-white/5 p-3 rounded-xl border border-white/10">
+                    <p>1️⃣ افتح <strong>واتساب</strong> على هاتفك</p>
+                    <p>2️⃣ ادخل <strong>الإعدادات</strong> → <strong>الأجهزة المرتبطة</strong></p>
+                    <p>3️⃣ اضغط <strong>ربط جهاز</strong> وامسح الرمز</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Connected — show message box */}
+              {waStatus === "CONNECTED" && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4 text-green-400 font-bold">
+                    <span>✅</span> متصل — إرسال رسالة إلى {waTargetName}
+                  </div>
+                  <textarea
+                    className="w-full h-28 bg-[#0e1320] border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-green-500 resize-none mb-3"
+                    value={waMessage}
+                    onChange={(e) => setWaMessage(e.target.value)}
+                    placeholder="اكتب رسالتك..."
+                  />
+                  {waSendError && <p className="text-red-400 text-xs mb-3">{waSendError}</p>}
+                  <button
+                    onClick={handleSendWaMessage}
+                    disabled={waSending || !waMessage.trim()}
+                    className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl disabled:opacity-50 transition-colors"
+                  >
+                    {waSending ? "جاري الإرسال..." : "إرسال الرسالة 🚀"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

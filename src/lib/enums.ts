@@ -19,7 +19,7 @@ export enum LeadStatus {
   CLOSED_LOST = "CLOSED_LOST"
 }
 export enum LeadTier {
-  LEAD = "LEAD",
+  WARM = "WARM",
   HOT = "HOT",
   COLD = "COLD"
 }

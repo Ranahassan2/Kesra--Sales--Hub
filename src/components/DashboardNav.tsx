@@ -23,6 +23,7 @@ export default function DashboardNav({ role }: { role: string }) {
     links.push({ href: "/sales", label: "لوحتي" });
   }
   links.push({ href: "/account", label: "حسابي" });
+  links.push({ href: "/whatsapp-inbox", label: "💬 واتساب ويب" });
 
   return (
     <nav className="flex items-center gap-1 overflow-x-auto">
