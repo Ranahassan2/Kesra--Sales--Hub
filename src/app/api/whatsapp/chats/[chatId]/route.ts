@@ -10,13 +10,13 @@ export async function GET(
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const state = getWaState();
+  const state = getWaState(session.user.id);
   if (state.status !== "CONNECTED") {
     return NextResponse.json({ error: "WhatsApp not connected" }, { status: 503 });
   }
 
   try {
-    const client = getWaClient();
+    const client = getWaClient(session.user.id);
     const chatId = decodeURIComponent(params.chatId);
     let messages: any[] = [];
     try {
@@ -49,14 +49,14 @@ export async function POST(
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const state = getWaState();
+  const state = getWaState(session.user.id);
   if (state.status !== "CONNECTED") {
     return NextResponse.json({ error: "WhatsApp not connected" }, { status: 503 });
   }
 
   try {
     const { message } = await req.json();
-    const client = getWaClient();
+    const client = getWaClient(session.user.id);
     const chatId = decodeURIComponent(params.chatId);
     await client!.sendMessage(chatId, message);
     return NextResponse.json({ success: true });

@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Phone and message are required" }, { status: 400 });
     }
 
-    await sendWhatsAppMessage(phone, message);
+    await sendWhatsAppMessage(session.user.id, phone, message);
     return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Failed to send message" }, { status: 500 });

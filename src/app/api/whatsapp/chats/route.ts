@@ -7,40 +7,25 @@ export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const state = getWaState();
+  const state = getWaState(session.user.id);
   if (state.status !== "CONNECTED") {
     return NextResponse.json({ error: "WhatsApp not connected" }, { status: 503 });
   }
 
   try {
-    const client = getWaClient();
+    const client = getWaClient(session.user.id);
     const chats = await client!.getChats();
     
-    const chatData = await Promise.all(
-      chats.slice(0, 50).map(async (chat) => {
-        let lastMsg = null;
-        try {
-          const msgs = await chat.fetchMessages({ limit: 1 });
-          if (msgs.length > 0) {
-            const m = msgs[0];
-            lastMsg = {
-              body: m.body,
-              fromMe: m.fromMe,
-              timestamp: m.timestamp,
-            };
-          }
-        } catch {}
-        
-        return {
-          id: chat.id._serialized,
-          name: chat.name,
-          isGroup: chat.isGroup,
-          unreadCount: chat.unreadCount,
-          lastMessage: lastMsg,
-          timestamp: chat.timestamp,
-        };
-      })
-    );
+    const chatData = chats.slice(0, 50).map((chat) => {
+      return {
+        id: chat.id._serialized,
+        name: chat.name,
+        isGroup: chat.isGroup,
+        unreadCount: chat.unreadCount,
+        lastMessage: null, // We'll skip fetching the exact last message body to prevent freezing the server
+        timestamp: chat.timestamp,
+      };
+    });
 
     // Sort by timestamp descending
     chatData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));

@@ -80,16 +80,6 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      <p className="mb-3 text-sm font-semibold text-white">
-        كل الليدز في النظام {totalLeads > 200 && `(أحدث 200 من ${totalLeads} — استخدم البحث للوصول لباقي الليدز)`}
-      </p>
-      <LeadTable
-        leads={leads as any}
-        showAssignee
-        allowTransfer
-        canDelete={session?.user.role === "ADMIN"}
-        salesTeam={salesTeam}
-      />
     </DashboardShell>
   );
 }

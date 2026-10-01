@@ -10,6 +10,7 @@ export default function DashboardNav({ role }: { role: string }) {
 
   if (role === "ADMIN" || role === "HEAD_OF_SALES") {
     links.push({ href: "/admin", label: "لوحة التحكم" });
+    links.push({ href: "/admin/customers", label: "إدارة العملاء" });
     links.push({ href: "/admin/reports", label: "التقارير" });
     links.push({ href: "/admin/activity", label: "سجل النشاط" });
   }

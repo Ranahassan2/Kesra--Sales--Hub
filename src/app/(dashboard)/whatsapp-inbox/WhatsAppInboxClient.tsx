@@ -151,6 +151,19 @@ export default function WhatsAppInboxClient() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const handleLogout = async () => {
+    if (!confirm("هل أنت متأكد أنك تريد تسجيل الخروج من واتساب؟ ستحتاج إلى مسح رمز الـ QR مرة أخرى.")) return;
+    try {
+      setWaStatus("INITIALIZING"); // Show loading state briefly
+      await fetch("/api/whatsapp/logout", { method: "POST" });
+      setWaStatus("DISCONNECTED");
+      setWaQr(null);
+    } catch (e) {
+      console.error(e);
+      alert("حدث خطأ أثناء تسجيل الخروج");
+    }
+  };
+
   const handleSend = async () => {
     if (!selectedChat || !newMsg.trim()) return;
     
@@ -238,9 +251,14 @@ export default function WhatsAppInboxClient() {
               <span className="text-white font-bold flex items-center gap-2">
                 <span className="text-green-400">💬</span> المحادثات
               </span>
-              <button onClick={loadChats} className="text-slate-400 hover:text-white text-xs transition-colors">
-                {loadingChats ? "⟳ جاري..." : "⟳ تحديث"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={loadChats} className="text-slate-400 hover:text-white text-xs transition-colors">
+                  {loadingChats ? "⟳ جاري..." : "⟳ تحديث"}
+                </button>
+                <button onClick={handleLogout} className="text-rose-400 hover:text-rose-300 text-xs transition-colors border border-rose-500/30 px-2 py-1 rounded-md bg-rose-500/10">
+                  خروج
+                </button>
+              </div>
             </div>
             <div className="p-3 border-b border-white/5">
               <input
@@ -296,7 +314,7 @@ export default function WhatsAppInboxClient() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-white font-bold text-[15px] truncate">{selectedChat.name}</p>
-                  <p className="text-green-400 text-[11px]">متصل</p>
+                  <p className="text-slate-400 text-[11px]" dir="ltr">{selectedChat.id.split('@')[0]}</p>
                 </div>
               </div>
 
