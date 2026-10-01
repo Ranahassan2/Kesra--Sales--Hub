@@ -47,6 +47,14 @@ export default function UserManagementTable({
   const [file, setFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<string | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredUsers = users.filter((u) => 
+    u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    u.username.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   async function patchUser(id: string, body: any) {
     setBusy(true);
     try {
@@ -119,29 +127,50 @@ export default function UserManagementTable({
   return (
     <div className="space-y-4">
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row items-center gap-4 mb-6">
-        <button 
-          onClick={() => setShowCreate(true)}
-          className="bg-[#3b82f6] hover:bg-blue-600 text-white px-5 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center justify-center gap-2 shadow-sm w-full sm:w-auto"
-        >
-          إضافة موظف جديد
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="relative w-full md:max-w-md">
+          <input
+            type="text"
+            placeholder="بحث بالاسم، البريد الإلكتروني، أو اسم المستخدم..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="input-field w-full text-sm bg-[#0f1523] py-3.5 pr-10"
+          />
+          <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-        </button>
-        <button 
-          onClick={() => setShowUpload(true)}
-          className="bg-[#1e293b] hover:bg-slate-700 text-white px-5 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center justify-center gap-2 border border-white/5 shadow-sm w-full sm:w-auto"
-        >
-          رفع موظفين (شيت Excel)
-          <span className="text-lg">📥</span>
-        </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto shrink-0">
+          <button 
+            onClick={() => setShowUpload(true)}
+            className="bg-[#1e293b] hover:bg-slate-700 text-white px-5 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center justify-center gap-2 border border-white/5 shadow-sm w-full sm:w-auto"
+          >
+            رفع موظفين (شيت Excel)
+            <span className="text-lg">📥</span>
+          </button>
+          <button 
+            onClick={() => setShowCreate(true)}
+            className="bg-[#3b82f6] hover:bg-blue-600 text-white px-5 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center justify-center gap-2 shadow-sm w-full sm:w-auto"
+          >
+            إضافة موظف جديد
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Users Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {users.map((u) => (
+        {filteredUsers.length === 0 ? (
+          <div className="col-span-full py-10 text-center text-slate-400">
+            لم يتم العثور على موظفين بهذا الاسم أو البريد.
+          </div>
+        ) : (
+          filteredUsers.map((u) => (
           <div 
             key={u.id} 
             className="bg-[#121826] rounded-3xl border border-white/5 p-6 relative group shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
@@ -185,8 +214,7 @@ export default function UserManagementTable({
               </button>
             </div>
           </div>
-
-        ))}
+        )))}
       </div>
 
       {/* Global Settings Modal */}

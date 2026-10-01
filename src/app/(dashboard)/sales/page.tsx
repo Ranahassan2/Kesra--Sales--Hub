@@ -3,13 +3,13 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import DashboardShell from "@/components/DashboardShell";
 import StatCard from "@/components/StatCard";
-import LeadTable from "@/components/LeadTable";
+import SalesClient from "./SalesClient";
 
 export default async function SalesDashboard() {
   const session = await getServerSession(authOptions);
   const userId = session!.user.id;
 
-  const [myLeads, meetingsToday, upcomingMeetings, needsFollowUp] = await Promise.all([
+  const [myLeads, meetingsToday, closedWon, closedLost] = await Promise.all([
     prisma.lead.findMany({
       where: { assignedToId: userId },
       include: {
@@ -30,23 +30,22 @@ export default async function SalesDashboard() {
         },
       },
     }),
-    prisma.meeting.count({
-      where: { ownerId: userId, status: "SCHEDULED", scheduledAt: { gt: new Date() } },
-    }),
-    prisma.lead.count({ where: { assignedToId: userId, status: "NEEDS_FOLLOWUP" } }),
+    prisma.lead.count({ where: { assignedToId: userId, status: "CLOSED_WON" } }),
+    prisma.lead.count({ where: { assignedToId: userId, status: "CLOSED_LOST" } }),
   ]);
 
   return (
-    <DashboardShell title="لوحة Sales">
+    <DashboardShell title="لوحة المبيعات (Sales)">
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="عملاء محولين لي" value={myLeads.length} icon="🤝" />
-        <StatCard label="Meetings اليوم" value={meetingsToday} icon="📅" accent="text-status-new" />
-        <StatCard label="Meetings قادمة" value={upcomingMeetings} icon="🗓️" />
-        <StatCard label="يحتاجون متابعة" value={needsFollowUp} icon="⏰" accent="text-status-gold" />
+        <StatCard label="إجمالي عملائي" value={myLeads.length} icon="🤝" />
+        <StatCard label="مقابلات اليوم" value={meetingsToday} icon="📅" accent="text-accent-soft" />
+        <StatCard label="صفقات ناجحة" value={closedWon} icon="🤑" accent="text-status-won" />
+        <StatCard label="صفقات مرفوضة" value={closedLost} icon="💔" accent="text-status-lost" />
       </div>
 
-      <p className="mb-3 text-sm font-semibold text-white">عملائي المحوّلين</p>
-      <LeadTable leads={myLeads as any} />
+      <div className="glass-panel p-5">
+        <SalesClient leads={myLeads as any} />
+      </div>
     </DashboardShell>
   );
 }
