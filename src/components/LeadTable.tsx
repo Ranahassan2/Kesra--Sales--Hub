@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import StatusBadge from "@/components/StatusBadge";
 import TierBadge from "@/components/TierBadge";
+import { playNotificationSound } from "@/lib/audio";
 
 type SalesOption = { id: string; name: string; lastActiveAt?: Date | string | null };
 
@@ -1182,28 +1183,34 @@ function LeadActions({
             disabled={busy}
             onClick={async () => {
               setTransferError("");
-              if (!meetingDate && !selectedSales) {
-                setTransferError("يرجى إدخال الموعد أو اختيار موظف المبيعات أولاً");
+              if (!selectedSales || !meetingDate || !meetingNotes.trim()) {
+                setTransferError("يجب ملء جميع البيانات (موظف السيلز، موعد المقابلة، وملاحظات العميل) لإتمام التحويل.");
                 return;
               }
               try {
                 if (meetingDate) {
                   await onMeeting({
                     scheduledAt: new Date(meetingDate).toISOString(),
-                    notes: meetingNotes || undefined,
+                    notes: meetingNotes,
                   });
                 }
                 if (selectedSales) {
                   await onTransfer(selectedSales);
                 }
+                
+                // Trigger sound and success state
+                playNotificationSound();
+                setSaved(true);
+                setTimeout(() => setSaved(false), 2000);
+
                 setMeetingDate("");
                 setMeetingNotes("");
                 setSelectedSales("");
               } catch(e) {}
             }}
-            className="btn-primary w-full text-sm py-3 mt-4 bg-indigo-600 hover:bg-indigo-500"
+            className={`w-full text-sm py-3 mt-4 transition-colors ${saved ? 'bg-emerald-500 text-white rounded-xl shadow-lg font-semibold' : 'btn-primary'}`}
           >
-            حفظ البيانات وتحويل العميل
+            {saved ? "تم إدخال البيانات وتحويل العميل بنجاح ✓" : "حفظ البيانات وتحويل العميل"}
           </button>
         </div>
       )}
