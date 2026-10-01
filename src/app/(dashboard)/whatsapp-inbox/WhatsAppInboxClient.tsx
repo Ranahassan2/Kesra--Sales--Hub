@@ -222,14 +222,14 @@ export default function WhatsAppInboxClient() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col bg-[#121927] relative">
+            <div className="flex-1 flex flex-col bg-[#121927] relative min-w-0 overflow-hidden">
               {/* Chat Header */}
-              <div className="p-4 border-b border-white/10 flex items-center gap-4 bg-[#0f1523] z-10">
+              <div className="p-4 border-b border-white/10 flex items-center gap-4 bg-[#0f1523] z-10 flex-shrink-0">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${avatarColor(selectedChat.id)}`}>
                   {selectedChat.isGroup ? "👥" : getInitials(selectedChat.name)}
                 </div>
-                <div>
-                  <p className="text-white font-bold text-[15px]">{selectedChat.name}</p>
+                <div className="min-w-0">
+                  <p className="text-white font-bold text-[15px] truncate">{selectedChat.name}</p>
                   <p className="text-green-400 text-[11px]">متصل</p>
                 </div>
               </div>
@@ -251,7 +251,7 @@ export default function WhatsAppInboxClient() {
               </div>
 
               {/* Chat Input */}
-              <div className="p-4 border-t border-white/10 bg-[#0f1523] z-10">
+              <div className="p-4 border-t border-white/10 bg-[#0f1523] z-10 flex-shrink-0">
                 <div className="flex gap-3 items-center">
                   <input
                     type="text" value={newMsg} onChange={e => setNewMsg(e.target.value)}
