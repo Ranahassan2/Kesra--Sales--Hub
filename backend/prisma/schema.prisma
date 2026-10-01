@@ -58,7 +58,8 @@ model Lead {
   company        String?
   need           String? // احتياج العميل
   interestReason String? // سبب اهتمامه
-  notes          String?
+  notes          String? // ملاحظات التيلي سيلز
+  salesNotes     String? // ملاحظات السيلز
   storeUrl       String? // رابط المتجر (أو أكثر، مفصولة بفاصلة)
   socialMediaUrl String? // رابط السوشيال ميديا (أو أكثر، مفصولة بفاصلة)
 

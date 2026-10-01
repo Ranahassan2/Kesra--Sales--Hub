@@ -13,6 +13,7 @@ const updateSchema = z.object({
   need: z.string().optional().or(z.literal("")),
   interestReason: z.string().optional().or(z.literal("")),
   notes: z.string().optional().or(z.literal("")),
+  salesNotes: z.string().optional().or(z.literal("")),
   storeUrl: z.string().url().optional().or(z.literal("")),
   socialMediaUrl: z.string().url().optional().or(z.literal("")),
 });
@@ -61,6 +62,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         interestReason: parsed.data.interestReason || null,
       }),
       ...(parsed.data.notes !== undefined && { notes: parsed.data.notes || null }),
+      ...(parsed.data.salesNotes !== undefined && { salesNotes: parsed.data.salesNotes || null }),
       ...(parsed.data.storeUrl !== undefined && { storeUrl: parsed.data.storeUrl || null }),
       ...(parsed.data.socialMediaUrl !== undefined && { socialMediaUrl: parsed.data.socialMediaUrl || null }),
       activities: {

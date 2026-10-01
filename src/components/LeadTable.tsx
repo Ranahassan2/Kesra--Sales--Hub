@@ -41,6 +41,7 @@ export interface LeadRow {
   need?: string | null;
   interestReason?: string | null;
   notes?: string | null;
+  salesNotes?: string | null;
   storeUrl?: string | null;
   socialMediaUrl?: string | null;
   status: string;
@@ -477,11 +478,9 @@ export default function LeadTable({
                           <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); }}></div>
                           <div className="absolute left-0 mt-2 w-56 bg-[#0f1523] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col py-1">
 
-                            {!isSalesView && (
-                              <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("edit"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-right w-full">
-                                <span>✏️</span> تعديل البيانات
-                              </button>
-                            )}
+                            <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("edit"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-right w-full">
+                              <span>✏️</span> {isSalesView ? "تفاصيل وملاحظات السيلز" : "تعديل البيانات"}
+                            </button>
                             <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("status"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-right w-full">
                               <span>⏱️</span> أكشن مع العميل
                             </button>
@@ -851,6 +850,7 @@ function LeadActions({
     need: lead.need ?? "",
     interestReason: lead.interestReason ?? "",
     notes: lead.notes ?? "",
+    salesNotes: lead.salesNotes ?? "",
     storeUrl: lead.storeUrl ?? "",
     socialMediaUrl: lead.socialMediaUrl ?? "",
     tier: (lead.tier === "LEAD" || !lead.tier) ? "WARM" : lead.tier,
@@ -943,15 +943,27 @@ function LeadActions({
             </select>
           </div>
           <div className="sm:col-span-3">
-            <p className="mb-1 text-xs text-slate-500">ملاحظات عامة</p>
+            <p className="mb-1 text-xs text-slate-500">ملاحظات التيلي سيلز</p>
             <textarea
-              className="input-field text-sm w-full py-3"
-              placeholder="ملاحظات عامة..."
-              rows={3}
+              className="input-field text-sm w-full py-3 opacity-80 cursor-not-allowed"
+              placeholder="لا يوجد"
+              rows={2}
               value={edit.notes}
-              onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
+              disabled
             />
           </div>
+          {isSalesView && (
+            <div className="sm:col-span-3">
+              <p className="mb-1 text-xs text-purple-400 font-bold">ملاحظات السيلز (خاصة بك)</p>
+              <textarea
+                className="input-field text-sm w-full py-3 border-purple-500/30 focus:border-purple-500"
+                placeholder="اكتب ملاحظاتك وتقييمك للمقابلة هنا..."
+                rows={4}
+                value={edit.salesNotes}
+                onChange={(e) => setEdit({ ...edit, salesNotes: e.target.value })}
+              />
+            </div>
+          )}
           <div className="sm:col-span-3">
             <p className="mb-1 text-xs text-slate-500">لينك المتجر / الموقع</p>
             <div className="space-y-3">
