@@ -60,6 +60,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       where: { leadId: params.id, status: "SCHEDULED" },
       data: { ownerId: salesEmployee.id },
     }),
+    prisma.notification.create({
+      data: {
+        userId: salesEmployee.id,
+        title: "عميل جديد محول إليك",
+        message: `تم تحويل العميل ${lead.name} إليك من قبل ${session.user.name}. راجع مواعيد مقابلاتك.`,
+        type: "LEAD_TRANSFER",
+        link: "/sales",
+      },
+    }),
   ]);
 
   return NextResponse.json({ success: true, lead: updatedLead });

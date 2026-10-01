@@ -62,6 +62,13 @@ const STATUS_LABELS_FOR_SELECT: { value: string; label: string }[] = [
   { value: "INTERESTED", label: "مهتم" },
   { value: "NOT_INTERESTED", label: "غير مهتم" },
 ];
+
+const SALES_STATUS_OPTIONS = [
+  { value: "TRANSFERRED_TO_SALES", label: "قيد الانتظار / تم التحويل" },
+  { value: "MEETING_SCHEDULED", label: "تم تحديد/تأكيد مقابلة" },
+  { value: "CLOSED_WON", label: "تم البيع (Won) 🤑" },
+  { value: "CLOSED_LOST", label: "تم الرفض (Lost) 💔" },
+];
 const TIER_OPTIONS = ["WARM", "HOT", "COLD"];
 const MEETING_STATUS_OPTIONS = [
   { value: "SCHEDULED", label: "مجدول" },
@@ -98,6 +105,7 @@ export default function LeadTable({
   canDelete?: boolean;
   salesTeam?: SalesOption[];
   employees?: { id: string; name: string; role: string }[];
+  isSalesView?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -409,17 +417,21 @@ export default function LeadTable({
             </div>
           </div>
 
+          </div>
+
           {/* Add New Lead Button */}
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="bg-[#3b82f6] hover:bg-blue-600 text-white px-5 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center gap-2 shadow-sm w-full md:w-auto justify-center"
-          >
-            إضافة عميل جديد
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </button>
+          {!isSalesView && (
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-[#3b82f6] hover:bg-blue-600 text-white px-5 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center gap-2 shadow-sm w-full md:w-auto justify-center"
+            >
+              إضافة عميل جديد
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -466,9 +478,11 @@ export default function LeadTable({
                           <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); }}></div>
                           <div className="absolute left-0 mt-2 w-56 bg-[#0f1523] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col py-1">
 
-                            <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("edit"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-right w-full">
-                              <span>✏️</span> تعديل البيانات
-                            </button>
+                            {!isSalesView && (
+                              <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("edit"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-right w-full">
+                                <span>✏️</span> تعديل البيانات
+                              </button>
+                            )}
                             <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("status"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-right w-full">
                               <span>⏱️</span> أكشن مع العميل
                             </button>
@@ -539,7 +553,14 @@ export default function LeadTable({
                       {latestActivity ? `آخر تواصل: ${formatDateTime(latestActivity.createdAt)}` : "لم يتم التواصل بعد"}
                     </span>
                   </div>
-                  
+                  {/* Show Meeting Date and Notes for Sales */}
+                  {isSalesView && lead.meetings?.[0] && (
+                    <div className="mt-4 bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl">
+                      <p className="text-xs text-purple-400 font-bold mb-2">📅 ميعاد المقابلة: {formatDateTime(lead.meetings[0].scheduledAt)}</p>
+                      {lead.meetings[0].notes && <p className="text-[11px] text-slate-300 leading-relaxed bg-[#0b101a] p-2.5 rounded-lg border border-white/5">{lead.meetings[0].notes}</p>}
+                    </div>
+                  )}
+
                   {/* Notes box exactly like screenshot */}
                   {lead.notes ? (
                     <div className="mt-4 bg-[#182032] border border-white/5 p-3 rounded-xl text-xs text-slate-300 text-center truncate shadow-inner font-medium" title={lead.notes}>
@@ -698,6 +719,7 @@ export default function LeadTable({
                     .catch(() => {});
                 }
               }}
+              isSalesView={isSalesView}
             />
           </div>
         </div>
@@ -806,6 +828,7 @@ function LeadActions({
   onTransfer: (salesEmployeeId: string) => any;
   onEditDetails: (payload: Record<string, string>) => any;
   onDelete: () => void;
+  isSalesView?: boolean;
 }) {
   const [followUpDate, setFollowUpDate] = useState("");
   const [followUpNotes, setFollowUpNotes] = useState("");
@@ -1058,7 +1081,7 @@ function LeadActions({
             onChange={(e) => onStatus(e.target.value)}
             className="input-field text-sm py-3 w-full"
           >
-            {STATUS_LABELS_FOR_SELECT.map((s) => (
+            {(isSalesView ? SALES_STATUS_OPTIONS : STATUS_LABELS_FOR_SELECT).map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
@@ -1077,7 +1100,7 @@ function LeadActions({
               onChange={(e) => onStatus(e.target.value)}
               className="input-field text-sm py-3 w-full"
             >
-              {STATUS_LABELS_FOR_SELECT.map((s) => (
+              {(isSalesView ? SALES_STATUS_OPTIONS : STATUS_LABELS_FOR_SELECT).map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
                 </option>

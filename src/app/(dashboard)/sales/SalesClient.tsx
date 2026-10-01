@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LeadTable from "@/components/LeadTable";
 
 export default function SalesClient({ leads }: { leads: any[] }) {
@@ -27,6 +27,47 @@ export default function SalesClient({ leads }: { leads: any[] }) {
   if (activeTab === "meetings_today") displayedLeads = todaysMeetings;
   if (activeTab === "won") displayedLeads = wonLeads;
   if (activeTab === "lost") displayedLeads = lostLeads;
+
+  const [notifiedMeetings, setNotifiedMeetings] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    // Check every minute for upcoming meetings
+    const interval = setInterval(() => {
+      const now = new Date();
+      leads.forEach(lead => {
+        lead.meetings?.forEach((m: any) => {
+          if (m.status === "SCHEDULED" && !notifiedMeetings.has(m.id)) {
+            const meetingTime = new Date(m.scheduledAt);
+            const diffMs = meetingTime.getTime() - now.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            // If meeting is within exactly 15 minutes or 0 minutes
+            if ((diffMins <= 15 && diffMins > 0) || diffMins === 0) {
+              // Trigger a global custom event to show a toast, or just alert?
+              // Since we want in-system toast, let's use the NotificationBell or window event.
+              if (typeof window !== "undefined") {
+                const event = new CustomEvent("addToast", { 
+                  detail: { 
+                    type: "warning", 
+                    message: `تذكير: لديك مقابلة مع العميل ${lead.name} بعد ${diffMins === 0 ? 'الآن!' : diffMins + ' دقيقة'}` 
+                  } 
+                });
+                window.dispatchEvent(event);
+                
+                // Play sound
+                const playNotificationSound = require("@/lib/audio").playNotificationSound;
+                if (playNotificationSound) playNotificationSound();
+                
+                setNotifiedMeetings(prev => new Set(prev).add(m.id));
+              }
+            }
+          }
+        });
+      });
+    }, 60000); // every 60 seconds
+    
+    return () => clearInterval(interval);
+  }, [leads, notifiedMeetings]);
 
   return (
     <div>
@@ -73,7 +114,7 @@ export default function SalesClient({ leads }: { leads: any[] }) {
         </button>
       </div>
 
-      <LeadTable leads={displayedLeads} />
+      <LeadTable leads={displayedLeads} isSalesView={true} />
     </div>
   );
 }
