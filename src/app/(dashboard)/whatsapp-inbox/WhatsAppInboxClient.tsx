@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 
 type Chat = {
   id: string;
@@ -45,6 +46,9 @@ function avatarColor(id: string) {
 }
 
 export default function WhatsAppInboxClient() {
+  const searchParams = useSearchParams();
+  const phoneQuery = searchParams.get("phone");
+
   const [waStatus, setWaStatus] = useState<WaStatus>("DISCONNECTED");
   const [waQr, setWaQr] = useState<string | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -85,6 +89,29 @@ export default function WhatsAppInboxClient() {
     const iv = setInterval(loadChats, 10000);
     return () => clearInterval(iv);
   }, [loadChats]);
+
+  // Handle auto-selecting chat from URL
+  useEffect(() => {
+    if (phoneQuery && chats.length > 0 && !selectedChat) {
+      const formatted = phoneQuery.replace(/[^0-9]/g, "");
+      // Look for a chat that contains this number
+      const matchingChat = chats.find(c => c.id.includes(formatted));
+      
+      if (matchingChat) {
+        setSelectedChat(matchingChat);
+      } else {
+        // If chat doesn't exist yet, create a dummy one to allow sending first message
+        setSelectedChat({
+          id: `${formatted}@c.us`,
+          name: phoneQuery,
+          isGroup: false,
+          unreadCount: 0,
+          lastMessage: null,
+          timestamp: Math.floor(Date.now() / 1000)
+        });
+      }
+    }
+  }, [phoneQuery, chats, selectedChat]);
 
   const loadMessages = useCallback(async () => {
     if (!selectedChat) return;

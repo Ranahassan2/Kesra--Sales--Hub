@@ -494,7 +494,7 @@ export default function LeadTable({
                 {/* Actions */}
                 <div className="mt-2 pt-4 flex gap-3 border-t border-white/[0.03]">
                   <a 
-                    href="/whatsapp-inbox"
+                    href={`/whatsapp-inbox?phone=${lead.phone}`}
                     className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 text-[13px] transition-colors text-center flex items-center justify-center gap-2 font-semibold shadow-[0_4px_12px_rgba(79,70,229,0.3)]"
                   >
                     واتساب 💬
