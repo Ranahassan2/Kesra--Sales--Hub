@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import LeadTable from "@/components/LeadTable";
 
 export default function SalesClient({ leads }: { leads: any[] }) {
-  const [activeTab, setActiveTab] = useState<"all" | "meetings_today" | "won" | "lost">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "new" | "meetings_today" | "no_answer" | "followup" | "won" | "lost">("all");
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -12,21 +12,27 @@ export default function SalesClient({ leads }: { leads: any[] }) {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   // Filter for Today's Meetings
-  const todaysMeetings = leads.filter(l => 
-    l.meetings?.some((m: any) => 
-      m.status === "SCHEDULED" && 
-      new Date(m.scheduledAt) >= today && 
+  const todaysMeetings = leads.filter(l =>
+    l.meetings?.some((m: any) =>
+      m.status === "SCHEDULED" &&
+      new Date(m.scheduledAt) >= today &&
       new Date(m.scheduledAt) < tomorrow
     )
   );
 
-  const wonLeads = leads.filter(l => l.status === "CLOSED_WON");
-  const lostLeads = leads.filter(l => l.status === "CLOSED_LOST");
+  const newLeads     = leads.filter(l => l.status === "NEW");
+  const noAnswerLeads = leads.filter(l => l.status === "NO_ANSWER" || l.status === "NOT_AVAILABLE");
+  const followupLeads = leads.filter(l => l.status === "NEEDS_FOLLOWUP");
+  const wonLeads     = leads.filter(l => l.status === "CLOSED_WON");
+  const lostLeads    = leads.filter(l => l.status === "CLOSED_LOST");
 
   let displayedLeads = leads;
+  if (activeTab === "new")           displayedLeads = newLeads;
   if (activeTab === "meetings_today") displayedLeads = todaysMeetings;
-  if (activeTab === "won") displayedLeads = wonLeads;
-  if (activeTab === "lost") displayedLeads = lostLeads;
+  if (activeTab === "no_answer")     displayedLeads = noAnswerLeads;
+  if (activeTab === "followup")      displayedLeads = followupLeads;
+  if (activeTab === "won")           displayedLeads = wonLeads;
+  if (activeTab === "lost")          displayedLeads = lostLeads;
 
   const [notifiedMeetings, setNotifiedMeetings] = useState<Set<string>>(new Set());
 
@@ -72,46 +78,27 @@ export default function SalesClient({ leads }: { leads: any[] }) {
   return (
     <div>
       <div className="mb-6 flex space-x-2 space-x-reverse overflow-x-auto border-b border-white/10 pb-2">
-        <button
-          className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-            activeTab === "all"
-              ? "bg-accent/20 text-accent-soft"
-              : "text-slate-400 hover:bg-white/5 hover:text-white"
-          }`}
-          onClick={() => setActiveTab("all")}
-        >
-          كل عملائي ({leads.length})
-        </button>
-        <button
-          className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-            activeTab === "meetings_today"
-              ? "bg-accent/20 text-accent-soft"
-              : "text-slate-400 hover:bg-white/5 hover:text-white"
-          }`}
-          onClick={() => setActiveTab("meetings_today")}
-        >
-          اجتماعات ومقابلات اليوم ({todaysMeetings.length})
-        </button>
-        <button
-          className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-            activeTab === "won"
-              ? "bg-status-won/20 text-status-won"
-              : "text-slate-400 hover:bg-white/5 hover:text-white"
-          }`}
-          onClick={() => setActiveTab("won")}
-        >
-          صفقات ناجحة 🤑 ({wonLeads.length})
-        </button>
-        <button
-          className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-            activeTab === "lost"
-              ? "bg-status-lost/20 text-status-lost"
-              : "text-slate-400 hover:bg-white/5 hover:text-white"
-          }`}
-          onClick={() => setActiveTab("lost")}
-        >
-          مرفوض / خسرناها 💔 ({lostLeads.length})
-        </button>
+        {[
+          { key: "all",           label: `الكل (${leads.length})`,                   color: "accent" },
+          { key: "new",           label: `🆕 جديد (${newLeads.length})`,              color: "blue" },
+          { key: "meetings_today",label: `📅 مقابلات اليوم (${todaysMeetings.length})`, color: "accent" },
+          { key: "no_answer",     label: `📞 لا يرد/غير متاح (${noAnswerLeads.length})`,color: "yellow" },
+          { key: "followup",      label: `🔄 يحتاج متابعة (${followupLeads.length})`, color: "purple" },
+          { key: "won",           label: `✅ ناجح (${wonLeads.length})`,              color: "won" },
+          { key: "lost",          label: `❌ خاسر (${lostLeads.length})`,             color: "lost" },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+              activeTab === tab.key
+                ? "bg-accent/20 text-accent-soft border border-accent/30"
+                : "text-slate-400 hover:bg-white/5 hover:text-white"
+            }`}
+            onClick={() => setActiveTab(tab.key as any)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       <LeadTable leads={displayedLeads} isSalesView={true} />

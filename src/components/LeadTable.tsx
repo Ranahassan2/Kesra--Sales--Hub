@@ -65,10 +65,16 @@ const STATUS_LABELS_FOR_SELECT: { value: string; label: string }[] = [
 ];
 
 const SALES_STATUS_OPTIONS = [
-  { value: "TRANSFERRED_TO_SALES", label: "قيد الانتظار / تم التحويل" },
-  { value: "MEETING_SCHEDULED", label: "تم تحديد/تأكيد مقابلة" },
-  { value: "CLOSED_WON", label: "تم البيع (Won) 🤑" },
-  { value: "CLOSED_LOST", label: "تم الرفض (Lost) 💔" },
+  { value: "NEW", label: "🆕 جديد" },
+  { value: "NO_ANSWER", label: "📞 لا يرد" },
+  { value: "NOT_AVAILABLE", label: "⛔ غير متاح" },
+  { value: "NEEDS_FOLLOWUP", label: "🔄 يحتاج متابعة" },
+  { value: "MEETING_SCHEDULED", label: "📅 تم تأكيد مقابلة" },
+  { value: "MEETING_DONE", label: "🤝 تمت المقابلة" },
+  { value: "INTERESTED", label: "😍 مهتم" },
+  { value: "NOT_INTERESTED", label: "😕 غير مهتم" },
+  { value: "CLOSED_WON", label: "✅ صفقة ناجحة (Won) 🤑" },
+  { value: "CLOSED_LOST", label: "❌ صفقة خاسرة (Lost) 💔" },
 ];
 const TIER_OPTIONS = ["WARM", "HOT", "COLD"];
 const MEETING_STATUS_OPTIONS = [
