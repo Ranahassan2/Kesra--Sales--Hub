@@ -93,3 +93,24 @@ async function applyUpdate(userId: string, data: z.infer<typeof updateSchema>) {
     throw e;
   }
 }
+
+// DELETE /api/users/[id]
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session || !can(session.user.role, "MANAGE_USERS")) {
+    return NextResponse.json({ error: "غير مصرح لك بهذا الإجراء" }, { status: 403 });
+  }
+
+  if (session.user.id === params.id) {
+    return NextResponse.json({ error: "لا يمكنك حذف حسابك الشخصي" }, { status: 400 });
+  }
+
+  try {
+    // Delete user from DB
+    await prisma.user.delete({ where: { id: params.id } });
+    return NextResponse.json({ success: true });
+  } catch (e: any) {
+    // Handling foreign key constraint failure
+    return NextResponse.json({ error: "لا يمكن حذف هذا الموظف لوجود عملاء أو نشاطات مسجلة باسمه. قم بتعطيل الحساب بدلاً من الحذف." }, { status: 400 });
+  }
+}
