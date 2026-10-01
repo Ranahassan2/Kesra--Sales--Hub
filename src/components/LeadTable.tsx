@@ -417,8 +417,6 @@ export default function LeadTable({
             </div>
           </div>
 
-          </div>
-
           {/* Add New Lead Button */}
           {!isSalesView && (
             <button 
