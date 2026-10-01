@@ -62,7 +62,7 @@ export default async function DashboardShell({
           <DashboardNav role={role} />
         </div>
       </header>
-      <main className="mx-auto w-full max-w-[96%] px-6 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-[96%] px-6 py-8 flex-1 min-w-0">{children}</main>
     </div>
   );
 }

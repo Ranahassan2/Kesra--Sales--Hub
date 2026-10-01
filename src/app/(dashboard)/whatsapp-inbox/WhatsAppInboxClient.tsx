@@ -94,9 +94,23 @@ export default function WhatsAppInboxClient() {
   useEffect(() => {
     if (phoneQuery && chats.length > 0 && !selectedChat) {
       let formatted = phoneQuery.replace(/[^0-9]/g, "");
-      // Add country code for Egypt numbers if missing
+      
+      // Remove leading "00" if user typed it (e.g., 00966 -> 966)
+      if (formatted.startsWith("00")) {
+        formatted = formatted.substring(2);
+      }
+      
+      // Add country code for Egypt numbers (Starts with 01, length 11 -> 201...)
       if (formatted.startsWith("01") && formatted.length === 11) {
         formatted = "2" + formatted;
+      }
+      // Add country code for Saudi numbers (Starts with 05, length 10 -> 9665...)
+      else if (formatted.startsWith("05") && formatted.length === 10) {
+        formatted = "966" + formatted.substring(1);
+      }
+      // Add country code for Saudi numbers (Starts with 5, length 9 -> 9665...)
+      else if (formatted.startsWith("5") && formatted.length === 9) {
+        formatted = "966" + formatted;
       }
       
       // Look for a chat that contains this number
@@ -176,7 +190,7 @@ export default function WhatsAppInboxClient() {
   if (!mounted) return null;
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-120px)] w-full relative">
+    <div className="flex-1 flex flex-col h-[calc(100vh-160px)] w-full max-w-6xl mx-auto relative overflow-hidden min-h-0">
       {/* NOT CONNECTED */}
       {waStatus !== "CONNECTED" && (
         <div className="m-auto max-w-md bg-[#121927] border border-white/10 rounded-2xl p-8 text-center shadow-2xl">
@@ -217,9 +231,9 @@ export default function WhatsAppInboxClient() {
 
       {/* CONNECTED INBOX */}
       {waStatus === "CONNECTED" && (
-        <div className="flex gap-0 rounded-2xl overflow-hidden border border-white/10 shadow-2xl w-full h-full bg-[#121927]">
+        <div className="flex gap-0 rounded-2xl overflow-hidden border border-white/10 shadow-2xl w-full h-full bg-[#121927] min-h-0">
           {/* Sidebar */}
-          <div className="w-80 min-w-[320px] bg-[#0f1523] border-l border-white/10 flex flex-col z-10">
+          <div className="w-80 min-w-[320px] bg-[#0f1523] border-l border-white/10 flex flex-col z-10 flex-shrink-0 h-full">
             <div className="p-4 border-b border-white/10 flex items-center justify-between">
               <span className="text-white font-bold flex items-center gap-2">
                 <span className="text-green-400">💬</span> المحادثات
@@ -266,7 +280,7 @@ export default function WhatsAppInboxClient() {
 
           {/* Messages Area */}
           {!selectedChat ? (
-            <div className="flex-1 bg-[#121927] flex items-center justify-center">
+            <div className="flex-1 bg-[#121927] flex items-center justify-center min-w-0 h-full">
               <div className="text-center text-slate-500">
                 <div className="text-6xl mb-4">💬</div>
                 <p className="text-xl font-bold text-white mb-2">واتساب ويب</p>
@@ -274,24 +288,24 @@ export default function WhatsAppInboxClient() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col bg-[#121927] relative min-w-0 overflow-hidden">
+            <div className="flex-1 flex flex-col bg-[#121927] relative min-w-0 overflow-hidden h-full min-h-0">
               {/* Chat Header */}
-              <div className="p-4 border-b border-white/10 flex items-center gap-4 bg-[#0f1523] z-10 flex-shrink-0">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${avatarColor(selectedChat.id)}`}>
+              <div className="h-[72px] min-h-[72px] p-4 border-b border-white/10 flex items-center gap-4 bg-[#0f1523] z-10 flex-shrink-0 w-full">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${avatarColor(selectedChat.id)}`}>
                   {selectedChat.isGroup ? "👥" : getInitials(selectedChat.name)}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-white font-bold text-[15px] truncate">{selectedChat.name}</p>
                   <p className="text-green-400 text-[11px]">متصل</p>
                 </div>
               </div>
 
               {/* Chat Messages */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[#121927] custom-scrollbar">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-4 bg-[#121927] custom-scrollbar w-full min-h-0">
                 {messages.map(msg => (
                   <div key={msg.id} className={`flex ${msg.fromMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-md relative ${msg.fromMe ? "bg-[#005c4b] text-white rounded-br-sm" : "bg-[#202c33] text-white rounded-bl-sm"}`}>
-                      <p className="whitespace-pre-wrap leading-relaxed mb-1">{msg.body || <em className="opacity-50">[ميديا]</em>}</p>
+                    <div className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-md relative break-words ${msg.fromMe ? "bg-[#005c4b] text-white rounded-br-sm" : "bg-[#202c33] text-white rounded-bl-sm"}`}>
+                      <p className="whitespace-pre-wrap leading-relaxed mb-1 break-words">{msg.body || <em className="opacity-50">[ميديا]</em>}</p>
                       <div className="flex items-center justify-end gap-1">
                         <p className={`text-[10px] ${msg.fromMe ? "text-green-200" : "text-slate-400"}`}>{formatTime(msg.timestamp)}</p>
                         {msg.fromMe && <span className="text-blue-400 text-[10px]">✓✓</span>}
