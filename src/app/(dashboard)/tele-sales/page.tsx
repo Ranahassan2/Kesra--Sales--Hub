@@ -7,11 +7,13 @@ import StatCard from "@/components/StatCard";
 import LeadTable from "@/components/LeadTable";
 
 
+import TeleSalesClient from "./TeleSalesClient";
+
 export default async function TeleSalesDashboard() {
   const session = await getServerSession(authOptions);
   const userId = session!.user.id;
 
-  const [myLeads, needsFollowUp, hotGold, todaysFollowUps, salesTeam] = await Promise.all([
+  const [myLeads, needsFollowUp, transferred, todaysFollowUps, salesTeam] = await Promise.all([
     prisma.lead.findMany({
       where: {
         OR: [
@@ -35,7 +37,7 @@ export default async function TeleSalesDashboard() {
       orderBy: { updatedAt: "desc" },
     }),
     prisma.lead.count({ where: { assignedToId: userId, status: "NEEDS_FOLLOWUP" } }),
-    prisma.lead.count({ where: { assignedToId: userId, tier: { in: ["HOT", "COLD"] } } }),
+    prisma.lead.count({ where: { assignedToId: userId, status: "TRANSFERRED_TO_SALES" } }),
     prisma.followUp.count({
       where: {
         createdById: userId,
@@ -53,16 +55,17 @@ export default async function TeleSalesDashboard() {
   ]);
 
   return (
-    <DashboardShell title="لوحة Tele-Sales">
+    <DashboardShell title="لوحة العمليات (Tele-Sales)">
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="عدد عملائي" value={myLeads.length} icon="👤" />
+        <StatCard label="إجمالي عملائي" value={myLeads.length} icon="👤" />
+        <StatCard label="متابعات اليوم" value={todaysFollowUps} icon="📌" accent="text-accent-soft" />
         <StatCard label="يحتاجون متابعة" value={needsFollowUp} icon="⏰" accent="text-status-gold" />
-        <StatCard label="Hot / Cold" value={hotGold} icon="🔥" accent="text-status-hot" />
-        <StatCard label="متابعات اليوم" value={todaysFollowUps} icon="📌" />
+        <StatCard label="تم التحويل بنجاح" value={transferred} icon="✅" accent="text-status-won" />
       </div>
 
-      <p className="mb-3 text-sm font-semibold text-white">عملائي</p>
-      <LeadTable leads={myLeads as any} allowTransfer salesTeam={salesTeam} />
+      <div className="glass-panel p-5">
+        <TeleSalesClient leads={myLeads as any} salesTeam={salesTeam} />
+      </div>
     </DashboardShell>
   );
 }

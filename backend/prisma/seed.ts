@@ -19,17 +19,7 @@ async function main() {
     },
   });
 
-  const headOfSales = await prisma.user.upsert({
-    where: { username: "head.sales" },
-    update: {},
-    create: {
-      name: "رئيس المبيعات",
-      username: "head.sales",
-      email: "head.sales@kesra.ai",
-      passwordHash: password,
-      role: Role.HEAD_OF_SALES,
-    },
-  });
+
 
   const teleSalesNames = ["أحمد", "سارة", "محمد", "منة", "يوسف"];
   const teleSalesUsers: any[] = [];
@@ -80,7 +70,7 @@ async function main() {
 
   console.log("✅ تم إنشاء بيانات تجريبية:");
   console.log("   Admin       → username: admin        / password: Passw0rd!");
-  console.log("   Head Sales  → username: head.sales    / password: Passw0rd!");
+
   console.log("   Tele-Sales  → username: tele1..tele5   / password: Passw0rd!");
   console.log("   Sales       → username: sales1, sales2 / password: Passw0rd!");
 }

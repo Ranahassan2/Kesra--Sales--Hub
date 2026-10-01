@@ -69,7 +69,6 @@ export async function POST(req: NextRequest) {
   (parsed.data as any[]).forEach((row, i) => {
     let mappedRole = row.role;
     if (mappedRole === "ادمن" || mappedRole === "أدمن" || mappedRole === "مدير النظام") mappedRole = "ADMIN";
-    if (mappedRole === "رئيس المبيعات" || mappedRole === "هيد سيلز") mappedRole = "HEAD_SALES";
     if (mappedRole === "موظف" || mappedRole === "مبيعات" || mappedRole === "تيلي سيلز") mappedRole = "TELE_SALES";
     if (mappedRole === "كاستمر سيرفيس" || mappedRole === "خدمة عملاء") mappedRole = "CUSTOMER_SERVICE";
     

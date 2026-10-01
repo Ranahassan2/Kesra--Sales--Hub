@@ -17,7 +17,6 @@ export interface UserRow {
 
 const ROLE_OPTIONS = [
   { value: "ADMIN", label: "مدير النظام" },
-  { value: "HEAD_OF_SALES", label: "رئيس المبيعات" },
   { value: "TELE_SALES", label: "موظف Tele-Sales" },
   { value: "SALES", label: "موظف Sales" },
 ];
@@ -33,6 +32,7 @@ export default function UserManagementTable({
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [newUser, setNewUser] = useState({
     name: "",
@@ -276,14 +276,34 @@ export default function UserManagementTable({
                   </option>
                 ))}
               </select>
-              <input
-                autoComplete="new-password"
-                type="password"
-                className="input-field w-full text-sm bg-[#0f1523] py-3"
-                placeholder="كلمة المرور المبدئية *"
-                value={newUser.password}
-                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-              />
+              <div className="relative">
+                <input
+                  autoComplete="new-password"
+                  type={showCreatePassword ? "text" : "password"}
+                  className="input-field w-full text-sm bg-[#0f1523] py-3 pl-10"
+                  placeholder="كلمة المرور المبدئية *"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
+                  onClick={() => setShowCreatePassword(!showCreatePassword)}
+                  tabIndex={-1}
+                >
+                  {showCreatePassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  )}
+                </button>
+              </div>
               
               {createError && <p className="text-sm text-status-hot mt-2">{createError}</p>}
               
@@ -382,6 +402,7 @@ function UserActions({
 }) {
   const [role, setRole] = useState(user.role);
   const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   
   const [basicInfo, setBasicInfo] = useState({
     name: user.name,
@@ -408,6 +429,7 @@ function UserActions({
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-400 block">الاسم</label>
               <input 
+                autoComplete="new-password"
                 className="input-field w-full text-sm bg-[#0f1523] py-3" 
                 value={basicInfo.name} 
                 onChange={e => setBasicInfo({...basicInfo, name: e.target.value})} 
@@ -416,6 +438,9 @@ function UserActions({
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-400 block">اسم المستخدم</label>
               <input 
+                autoComplete="off"
+                name="username_no_autofill"
+                id="username_no_autofill"
                 className="input-field w-full text-sm bg-[#0f1523] py-3" 
                 dir="ltr"
                 value={basicInfo.username} 
@@ -425,6 +450,9 @@ function UserActions({
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-400 block">البريد الإلكتروني</label>
               <input 
+                autoComplete="off"
+                name="email_no_autofill"
+                id="email_no_autofill"
                 className="input-field w-full text-sm bg-[#0f1523] py-3" 
                 dir="ltr"
                 value={basicInfo.email} 
@@ -434,6 +462,9 @@ function UserActions({
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-400 block">رقم الهاتف (اختياري)</label>
               <input 
+                autoComplete="off"
+                name="phone_no_autofill"
+                id="phone_no_autofill"
                 className="input-field w-full text-sm bg-[#0f1523] py-3" 
                 dir="ltr"
                 value={basicInfo.phone} 
@@ -483,13 +514,33 @@ function UserActions({
         <div className="bg-[#121826] p-6 rounded-3xl border border-white/5">
           <p className="text-sm font-semibold text-white mb-4">إعادة تعيين كلمة المرور</p>
           <div className="flex flex-col gap-4">
-            <input
-              type="password"
-              placeholder="كلمة مرور جديدة (6 أحرف على الأقل)"
-              className="input-field w-full text-sm bg-[#0f1523] py-3"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="كلمة مرور جديدة (6 أحرف على الأقل)"
+                className="input-field w-full text-sm bg-[#0f1523] py-3 pl-10"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                )}
+              </button>
+            </div>
             <button
               disabled={busy || newPassword.length < 6}
               onClick={() => {
