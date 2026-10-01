@@ -505,7 +505,7 @@ export default function AdminCustomersClient({
           }`}
           onClick={() => setActiveTab("cards")}
         >
-          متابعة العملاء (البطاقات)
+          متابعة العملاء
         </button>
       </div>
 

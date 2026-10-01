@@ -480,8 +480,8 @@ export default function LeadTable({
                       <TierBadge tier={lead.tier} />
                     </div>
                     <div className="flex flex-col items-end gap-1.5 mt-1">
-                      {lead.status === "TRANSFERRED_TO_SALES" && lead.assignedTo?.name && (
-                        <span className="text-xs text-indigo-300 font-semibold px-2.5 py-1 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                      {showAssignee && lead.assignedTo?.name && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${lead.assignedTo.role === "SALES" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"}`}>
                           مع: {lead.assignedTo.name}
                         </span>
                       )}

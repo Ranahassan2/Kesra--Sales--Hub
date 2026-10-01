@@ -28,7 +28,7 @@ export default async function UsersPage() {
   const serialized = users.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() }));
 
   return (
-    <DashboardShell title="إدارة المستخدمين">
+    <DashboardShell title="إدارة الموظفين">
       <UserManagementTable users={serialized as any} currentUserId={session.user.id} />
     </DashboardShell>
   );

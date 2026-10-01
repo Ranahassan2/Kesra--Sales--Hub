@@ -10,6 +10,7 @@ import bcrypt from "bcryptjs";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
+  username: z.string().min(3).optional(),
   email: z.string().email().optional(),
   phone: z.string().optional().or(z.literal("")),
   role: z.nativeEnum(Role).optional(),
@@ -62,6 +63,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 async function applyUpdate(userId: string, data: z.infer<typeof updateSchema>) {
   const updateData: any = {};
   if (data.name !== undefined) updateData.name = data.name;
+  if (data.username !== undefined) updateData.username = data.username;
   if (data.email !== undefined) updateData.email = data.email;
   if (data.phone !== undefined) updateData.phone = data.phone || null;
   if (data.role !== undefined) updateData.role = data.role;

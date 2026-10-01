@@ -12,11 +12,10 @@ export default function DashboardNav({ role }: { role: string }) {
     links.push({ href: "/admin", label: "لوحة التحكم" });
     links.push({ href: "/admin/customers", label: "إدارة العملاء" });
     links.push({ href: "/admin/sheets", label: "إدارة الشيتات" });
-    links.push({ href: "/admin/reports", label: "التقارير" });
     links.push({ href: "/admin/activity", label: "سجل النشاط" });
   }
   if (role === "ADMIN") {
-    links.push({ href: "/admin/users", label: "المستخدمين" });
+    links.push({ href: "/admin/users", label: "الموظفين" });
   }
   if (role === "TELE_SALES") {
     links.push({ href: "/tele-sales", label: "لوحتي" });
