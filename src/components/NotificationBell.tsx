@@ -114,8 +114,8 @@ export default function NotificationBell() {
                   onClick={() => handleNotificationClick(notif)}
                 >
                   <div className="flex justify-between items-start mb-1">
-                    <h4 className={`text-sm ${notif.isRead ? 'text-slate-300 font-medium' : 'text-white font-bold'}`}>{notif.title}</h4>
-                    {!notif.isRead && <span className="w-2 h-2 rounded-full bg-indigo-500 mt-1"></span>}
+                    <h4 className={`text-sm pr-2 ${notif.isRead ? 'text-slate-300 font-medium' : 'text-white font-bold'}`}>{notif.title}</h4>
+                    <span className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${notif.isRead ? 'bg-emerald-500' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`}></span>
                   </div>
                   <p className="text-xs text-slate-400 leading-relaxed mb-2">{notif.message}</p>
                   <p className="text-[10px] text-slate-500">

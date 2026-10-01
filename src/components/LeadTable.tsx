@@ -66,16 +66,16 @@ const STATUS_LABELS_FOR_SELECT: { value: string; label: string }[] = [
 ];
 
 const SALES_STATUS_OPTIONS = [
-  { value: "NEW", label: "🆕 جديد" },
-  { value: "NO_ANSWER", label: "📞 لا يرد" },
-  { value: "NOT_AVAILABLE", label: "⛔ غير متاح" },
-  { value: "NEEDS_FOLLOWUP", label: "🔄 يحتاج متابعة" },
-  { value: "MEETING_SCHEDULED", label: "📅 تم تأكيد مقابلة" },
-  { value: "MEETING_DONE", label: "🤝 تمت المقابلة" },
-  { value: "INTERESTED", label: "😍 مهتم" },
-  { value: "NOT_INTERESTED", label: "😕 غير مهتم" },
-  { value: "CLOSED_WON", label: "✅ صفقة ناجحة (Won) 🤑" },
-  { value: "CLOSED_LOST", label: "❌ صفقة خاسرة (Lost) 💔" },
+  { value: "NEW", label: "جديد" },
+  { value: "NO_ANSWER", label: "لا يرد" },
+  { value: "NOT_AVAILABLE", label: "غير متاح" },
+  { value: "NEEDS_FOLLOWUP", label: "يحتاج متابعة" },
+  { value: "MEETING_SCHEDULED", label: "تم تأكيد مقابلة" },
+  { value: "MEETING_DONE", label: "تمت المقابلة" },
+  { value: "INTERESTED", label: "مهتم" },
+  { value: "NOT_INTERESTED", label: "غير مهتم" },
+  { value: "CLOSED_WON", label: "صفقة ناجحة (Won)" },
+  { value: "CLOSED_LOST", label: "صفقة خاسرة (Lost)" },
 ];
 const TIER_OPTIONS = ["WARM", "HOT", "COLD"];
 const MEETING_STATUS_OPTIONS = [
@@ -119,7 +119,7 @@ export default function LeadTable({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [openId, setOpenId] = useState<string | null>(null);
-  const [modalMode, setModalMode] = useState<"edit" | "details" | "status" | "task" | "transfer">("details");
+  const [modalMode, setModalMode] = useState<"edit" | "details" | "status" | "task" | "transfer" | "meeting-result">("details");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -495,6 +495,12 @@ export default function LeadTable({
                               <span>📅</span> إضافة متابعة مع العميل
                             </button>
 
+                            {isSalesView && lead.meetings?.[0]?.status === "SCHEDULED" && (
+                              <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("meeting-result"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-emerald-400 hover:bg-emerald-500/20 transition-colors text-right w-full border-t border-white/5 font-semibold">
+                                <span>✅</span> إنهاء المقابلة وكتابة التقرير
+                              </button>
+                            )}
+
                             {allowTransfer && (
                               <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("transfer"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-indigo-500/20 hover:text-indigo-400 transition-colors text-right w-full">
                                 <span>👥</span> تحويل إلى موظف سيلز
@@ -558,12 +564,19 @@ export default function LeadTable({
                       {latestActivity ? `آخر تواصل: ${formatDateTime(latestActivity.createdAt)}` : "لم يتم التواصل بعد"}
                     </span>
                   </div>
-                  {/* Show Meeting Date and Notes for Sales */}
-                  {isSalesView && lead.meetings?.[0] && (
-                    <div className="mt-4 bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl">
-                      <p className="text-xs text-purple-400 font-bold mb-2">📅 ميعاد المقابلة: {formatDateTime(lead.meetings[0].scheduledAt)}</p>
-                      {lead.meetings[0].notes && <p className="text-[11px] text-slate-300 leading-relaxed bg-[#0b101a] p-2.5 rounded-lg border border-white/5">{lead.meetings[0].notes}</p>}
-                    </div>
+                  {/* Show Meeting Date and Notes for Sales or Admin */}
+                  {(isSalesView || lead.currentStage === "SALES") && lead.meetings?.[0] && (
+                    lead.meetings[0].status === "DONE" ? (
+                      <div className="mt-4 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
+                        <p className="text-xs text-emerald-400 font-bold mb-2">✅ نتيجة المقابلة: {formatDateTime(lead.meetings[0].scheduledAt)}</p>
+                        {lead.meetings[0].result && <p className="text-[11px] text-slate-300 leading-relaxed bg-[#0b101a] p-2.5 rounded-lg border border-white/5">{lead.meetings[0].result}</p>}
+                      </div>
+                    ) : (
+                      <div className="mt-4 bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl">
+                        <p className="text-xs text-purple-400 font-bold mb-2">📅 ميعاد المقابلة: {formatDateTime(lead.meetings[0].scheduledAt)}</p>
+                        {lead.meetings[0].notes && <p className="text-[11px] text-slate-300 leading-relaxed bg-[#0b101a] p-2.5 rounded-lg border border-white/5">{lead.meetings[0].notes}</p>}
+                      </div>
+                    )
                   )}
 
                   {/* Notes box exactly like screenshot */}
@@ -694,6 +707,7 @@ export default function LeadTable({
                modalMode === "status" ? "أكشن مع العميل" :
                modalMode === "task" ? "إضافة متابعة مع العميل" :
                modalMode === "transfer" ? "تحويل العميل إلى موظف Sales" :
+               modalMode === "meeting-result" ? "تقرير المقابلة" :
                "تفاصيل العميل"}: {leads.find(l => l.id === openId)?.name}
             </h2>
             <LeadActions
@@ -813,9 +827,10 @@ function LeadActions({
   onTransfer,
   onEditDetails,
   onDelete,
+  isSalesView,
 }: {
   lead: LeadRow;
-  mode: "edit" | "details" | "status" | "task" | "transfer";
+  mode: "edit" | "details" | "status" | "task" | "transfer" | "meeting-result";
   busy: boolean;
   allowTransfer?: boolean;
   canDelete?: boolean;
@@ -1161,6 +1176,43 @@ function LeadActions({
               {saved ? "تم حفظ المتابعة بنجاح ✓" : "حفظ المتابعة"}
             </button>
           </div>
+        </div>
+      )}
+
+      {mode === "meeting-result" && isSalesView && lead.meetings?.[0] && (
+        <div className="space-y-4 max-w-sm mx-auto">
+          <div className="space-y-2 mt-2">
+            <p className="text-sm font-semibold text-slate-400">نتيجة المقابلة وملاحظات السيلز</p>
+            <textarea
+              rows={4}
+              placeholder="اكتب ماذا حدث في المقابلة وأي تفاصيل تهم المشرف..."
+              className="input-field text-sm resize-none py-3 w-full"
+              value={meetingResult}
+              onChange={(e) => setMeetingResult(e.target.value)}
+            />
+          </div>
+          <button
+            disabled={busy || saved || !meetingResult.trim()}
+            onClick={async () => {
+              try {
+                await onMeetingUpdate({
+                  meetingId: lead.meetings![0].id,
+                  status: "DONE",
+                  result: meetingResult
+                });
+                await onStatus("MEETING_DONE");
+                setSaved(true);
+                setTimeout(() => {
+                  setSaved(false);
+                }, 2000);
+              } catch (e) {
+                // handle error
+              }
+            }}
+            className={`w-full text-sm py-3 mt-4 transition-colors ${saved ? 'bg-emerald-500 text-white rounded-xl shadow-lg font-semibold' : 'btn-primary'}`}
+          >
+            {saved ? "تم حفظ التقرير بنجاح ✓" : "إنهاء المقابلة وحفظ التقرير"}
+          </button>
         </div>
       )}
 

@@ -68,6 +68,7 @@ model Lead {
   socialMediaUrl String? // رابط السوشيال ميديا
 
   status String @default("NEW")
+  salesStatus String?
   tier String   @default("LEAD")
   source String @default("MANUAL")
 

@@ -43,7 +43,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       data: {
         assignedToId: salesEmployee.id,
         currentStage: Role.SALES,
-        status: "NEW",
+        status: "TRANSFERRED_TO_SALES",
+        salesStatus: "NEW",
         transferredAt: new Date(),
       },
     }),

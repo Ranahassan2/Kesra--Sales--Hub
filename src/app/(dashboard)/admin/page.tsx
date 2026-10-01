@@ -11,6 +11,7 @@ import {
   TeamPerformanceChart,
   LeadsOverTimeChart,
 } from "@/components/ReportsCharts";
+import StaleLeadsChecker from "@/components/StaleLeadsChecker";
 
 export default async function AdminDashboard() {
   const session = await getServerSession(authOptions);
@@ -48,13 +49,27 @@ export default async function AdminDashboard() {
     prisma.lead.groupBy({ by: ["tier"], _count: { _all: true } }),
     prisma.user.findMany({
       where: { role: { in: [Role.TELE_SALES, Role.SALES] }, isActive: true },
-      select: { name: true, role: true, _count: { select: { assignedLeads: true } } },
+      select: { id: true, name: true, role: true, _count: { select: { assignedLeads: true } } },
     }),
     prisma.lead.findMany({
       where: { createdAt: { gte: since } },
       select: { createdAt: true },
     }),
   ]);
+
+  const teamWithActions = await Promise.all(
+    team.map(async (emp) => {
+      // Find all unique leads this employee has interacted with
+      const distinctLeads = await prisma.activity.findMany({
+        where: { userId: emp.id },
+        distinct: ['leadId'],
+        select: { leadId: true },
+      });
+      const actionCount = distinctLeads.length;
+
+      return { ...emp, actionCount };
+    })
+  );
 
   const statusData = statusGroups
     .map((g) => ({ status: g.status, count: g._count._all }))
@@ -81,6 +96,7 @@ export default async function AdminDashboard() {
 
   return (
     <DashboardShell title="لوحة تحكم الإدارة">
+      <StaleLeadsChecker />
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-6">
         <StatCard label="إجمالي الليدز" value={totalLeads} icon="📋" />
         <StatCard label="Hot / Cold" value={hotGold} icon="🔥" accent="text-status-hot" />
@@ -113,16 +129,26 @@ export default async function AdminDashboard() {
       </div>
 
       <div className="mb-6 glass-panel p-5">
-        <p className="mb-4 text-sm font-semibold text-white">تفاصيل أداء الفريق</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {team.map((emp) => (
-            <div key={emp.name} className="rounded-xl bg-white/[0.03] p-3 border border-white/5">
-              <p className="text-xs text-slate-400">{emp.name}</p>
-              <p className="text-xs text-slate-500">
-                {emp.role === "TELE_SALES" ? "Tele-Sales" : (emp.role === "SALES" ? "Sales" : emp.role)}
+        <p className="mb-4 text-sm font-semibold text-white">تفاصيل أداء الفريق (متابعة الأكشن)</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {teamWithActions.map((emp) => (
+            <div key={emp.name} className="rounded-xl bg-white/[0.03] p-4 border border-white/5 relative overflow-hidden group hover:border-white/10 transition">
+              <div className="absolute top-0 right-0 h-full w-1 bg-accent/50"></div>
+              <p className="text-sm text-slate-200 font-bold truncate pr-2">{emp.name}</p>
+              <p className="text-[11px] text-slate-500 mb-4 pr-2">
+                {emp.role === "TELE_SALES" ? "مبيعات هاتفية (Tele-Sales)" : (emp.role === "SALES" ? "مبيعات (Sales)" : emp.role)}
               </p>
-              <p className="mt-1 text-xl font-bold text-white">{emp._count.assignedLeads}</p>
-              <p className="text-xs text-slate-500">ليد حاليًا</p>
+              
+              <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/5">
+                <div>
+                  <p className="text-[10px] text-slate-500 font-medium">إجمالي الليدز</p>
+                  <p className="text-xl font-bold text-white mt-0.5">{emp._count.assignedLeads}</p>
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] text-emerald-500/80 font-medium">تم اتخاذ أكشن</p>
+                  <p className="text-xl font-bold text-emerald-400 mt-0.5">{emp.actionCount}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>

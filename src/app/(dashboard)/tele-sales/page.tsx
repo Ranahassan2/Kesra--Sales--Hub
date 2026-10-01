@@ -37,7 +37,7 @@ export default async function TeleSalesDashboard() {
       orderBy: { updatedAt: "desc" },
     }),
     prisma.lead.count({ where: { assignedToId: userId, status: "NEEDS_FOLLOWUP" } }),
-    prisma.lead.count({ where: { assignedToId: userId, status: "TRANSFERRED_TO_SALES" } }),
+    prisma.lead.count({ where: { activities: { some: { userId: userId, type: "TRANSFERRED" } } } }),
     prisma.followUp.count({
       where: {
         createdById: userId,

@@ -80,12 +80,12 @@ export default function SalesClient({ leads }: { leads: any[] }) {
       <div className="mb-6 flex space-x-2 space-x-reverse overflow-x-auto border-b border-white/10 pb-2">
         {[
           { key: "all",           label: `الكل (${leads.length})`,                   color: "accent" },
-          { key: "new",           label: `🆕 جديد (${newLeads.length})`,              color: "blue" },
-          { key: "meetings_today",label: `📅 مقابلات اليوم (${todaysMeetings.length})`, color: "accent" },
-          { key: "no_answer",     label: `📞 لا يرد/غير متاح (${noAnswerLeads.length})`,color: "yellow" },
-          { key: "followup",      label: `🔄 يحتاج متابعة (${followupLeads.length})`, color: "purple" },
-          { key: "won",           label: `✅ ناجح (${wonLeads.length})`,              color: "won" },
-          { key: "lost",          label: `❌ خاسر (${lostLeads.length})`,             color: "lost" },
+          { key: "new",           label: `جديد (${newLeads.length})`,              color: "blue" },
+          { key: "meetings_today",label: `مقابلات اليوم (${todaysMeetings.length})`, color: "accent" },
+          { key: "no_answer",     label: `لا يرد/غير متاح (${noAnswerLeads.length})`,color: "yellow" },
+          { key: "followup",      label: `يحتاج متابعة (${followupLeads.length})`, color: "purple" },
+          { key: "won",           label: `ناجح (${wonLeads.length})`,              color: "won" },
+          { key: "lost",          label: `خاسر (${lostLeads.length})`,             color: "lost" },
         ].map(tab => (
           <button
             key={tab.key}
