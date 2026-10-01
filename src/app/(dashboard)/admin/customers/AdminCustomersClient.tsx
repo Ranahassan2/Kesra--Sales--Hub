@@ -217,7 +217,11 @@ export default function AdminCustomersClient({
 
       if (!res.ok) throw new Error(await res.text());
       
-      showAlert("تم بنجاح", `تم تحويل ${selectedLeads.size} عميل للموظف بنجاح!`);
+      if (assignTarget === "AUTO") {
+        showAlert("تم بنجاح", `تم توزيع ${selectedLeads.size} عميل بالتساوي على موظفين التيلي سيلز بنجاح!`);
+      } else {
+        showAlert("تم بنجاح", `تم تحويل ${selectedLeads.size} عميل للموظف بنجاح!`);
+      }
       setSelectedLeads(new Set());
       setAssignTarget("");
       router.refresh();
@@ -553,6 +557,7 @@ export default function AdminCustomersClient({
             className="bg-[#182032] border border-indigo-500/30 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-indigo-500 flex-1 min-w-[180px]"
           >
             <option value="">-- اختر الموظف للتحويل --</option>
+            <option value="AUTO" className="text-amber-400 font-bold">🤖 توزيع تلقائي (بالتساوي على التيلي سيلز)</option>
             {employees.map(emp => (
               <option key={emp.id} value={emp.id}>{emp.name} ({emp.role === "TELE_SALES" ? "Tele" : "Sales"})</option>
             ))}

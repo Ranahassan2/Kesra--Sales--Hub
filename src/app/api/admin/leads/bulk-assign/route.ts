@@ -18,6 +18,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid data format" }, { status: 400 });
     }
 
+    if (employeeId === "AUTO") {
+      const teleSalesEmployees = await prisma.user.findMany({
+        where: { role: "TELE_SALES" }
+      });
+      if (teleSalesEmployees.length === 0) {
+        return NextResponse.json({ error: "لا يوجد موظفين تيلي سيلز لتوزيع العملاء عليهم" }, { status: 400 });
+      }
+
+      // Distribute leads evenly using round-robin logic
+      const updates = teleSalesEmployees.map((emp, index) => {
+        // Get leads for this specific employee
+        const assignedLeadIds = leadIds.filter((_, i) => i % teleSalesEmployees.length === index);
+        if (assignedLeadIds.length === 0) return null;
+        
+        return prisma.lead.updateMany({
+          where: { id: { in: assignedLeadIds } },
+          data: { assignedToId: emp.id }
+        });
+      }).filter(Boolean); // Remove nulls
+
+      await prisma.$transaction(updates as any);
+      return NextResponse.json({ success: true, auto: true });
+    }
+
     // Check if employee exists
     const employee = await prisma.user.findUnique({
       where: { id: employeeId },
