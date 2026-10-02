@@ -12,7 +12,7 @@ export default function DashboardNav({ role }: { role: string }) {
     links.push({ href: "/admin", label: "لوحة التحكم" });
     links.push({ href: "/admin/customers", label: "إدارة العملاء" });
     links.push({ href: "/admin/sheets", label: "إدارة الشيتات" });
-    links.push({ href: "/admin/activity", label: "سجل النشاط" });
+    links.push({ href: "/admin/activity", label: "متابعة الموظفين" });
     links.push({ href: "/admin/meetings", label: "تقرير بعد ميتنج" });
   }
   if (role === "ADMIN") {
@@ -24,7 +24,9 @@ export default function DashboardNav({ role }: { role: string }) {
   if (role === "SALES") {
     links.push({ href: "/sales", label: "لوحتي" });
   }
-  links.push({ href: "/account", label: "حسابي" });
+  if (role === "ADMIN") {
+    links.push({ href: "/account", label: "حسابي" });
+  }
   links.push({ href: "/whatsapp-inbox", label: "💬 واتساب ويب" });
 
   return (

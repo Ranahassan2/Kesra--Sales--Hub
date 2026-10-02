@@ -27,18 +27,46 @@ export async function POST(req: NextRequest) {
       }
 
       // Distribute leads evenly using round-robin logic
-      const updates = teleSalesEmployees.map((emp, index) => {
-        // Get leads for this specific employee
-        const assignedLeadIds = leadIds.filter((_, i) => i % teleSalesEmployees.length === index);
-        if (assignedLeadIds.length === 0) return null;
-        
-        return prisma.lead.updateMany({
-          where: { id: { in: assignedLeadIds } },
-          data: { assignedToId: emp.id }
-        });
-      }).filter(Boolean); // Remove nulls
+      const updates: any[] = [];
+      const activitiesToCreate: any[] = [];
+      const notificationsToCreate: any[] = [];
 
-      await prisma.$transaction(updates as any);
+      teleSalesEmployees.forEach((emp, index) => {
+        // Get leads for this specific employee
+        const assignedLeadIds = leadIds.filter((_: any, i: number) => i % teleSalesEmployees.length === index);
+        if (assignedLeadIds.length === 0) return;
+        
+        updates.push(prisma.lead.updateMany({
+          where: { id: { in: assignedLeadIds } },
+          data: { assignedToId: emp.id, currentStage: "TELE_SALES" }
+        }));
+
+        assignedLeadIds.forEach((id: string) => {
+          activitiesToCreate.push({
+            leadId: id,
+            userId: session.user.id,
+            type: "LEAD_ASSIGNED",
+            message: `تم تعيين العميل إلى ${emp.name}`,
+          });
+        });
+
+        notificationsToCreate.push({
+          userId: emp.id,
+          title: "عملاء جدد",
+          message: `تم توزيع ${assignedLeadIds.length} عملاء جدد لك`,
+          type: "ASSIGNMENT",
+          link: "?status=NEW",
+        });
+      });
+
+      if (activitiesToCreate.length > 0) {
+        updates.push(prisma.activity.createMany({ data: activitiesToCreate }));
+      }
+      if (notificationsToCreate.length > 0) {
+        updates.push(prisma.notification.createMany({ data: notificationsToCreate }));
+      }
+
+      await prisma.$transaction(updates);
       return NextResponse.json({ success: true, auto: true });
     }
 
@@ -54,18 +82,38 @@ export async function POST(req: NextRequest) {
     // If assigned to SALES, we might want to change status to TRANSFERRED_TO_SALES
     const updateData: any = {
       assignedToId: employeeId,
+      currentStage: employee.role,
     };
 
     if (employee.role === "SALES") {
       updateData.status = "TRANSFERRED_TO_SALES";
     }
 
-    await prisma.lead.updateMany({
-      where: {
-        id: { in: leadIds },
-      },
-      data: updateData,
-    });
+    const updates = [
+      prisma.lead.updateMany({
+        where: { id: { in: leadIds } },
+        data: updateData,
+      }),
+      prisma.activity.createMany({
+        data: leadIds.map((id: string) => ({
+          leadId: id,
+          userId: session.user.id,
+          type: "LEAD_ASSIGNED",
+          message: `تم تعيين العميل إلى ${employee.name}`,
+        })),
+      }),
+      prisma.notification.create({
+        data: {
+          userId: employeeId,
+          title: "عملاء جدد",
+          message: `تم تحويل ${leadIds.length} عملاء إليك`,
+          type: "ASSIGNMENT",
+          link: "?status=NEW",
+        },
+      }),
+    ];
+
+    await prisma.$transaction(updates);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

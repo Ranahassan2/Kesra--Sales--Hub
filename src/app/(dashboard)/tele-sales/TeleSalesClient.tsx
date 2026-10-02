@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import LeadTable from "@/components/LeadTable";
+import TodoList from "@/components/TodoList";
 
 export default function TeleSalesClient({ leads, salesTeam }: { leads: any[], salesTeam: any[] }) {
   const [activeTab, setActiveTab] = useState<"today" | "all" | "transferred">("all");
@@ -27,6 +28,8 @@ export default function TeleSalesClient({ leads, salesTeam }: { leads: any[], sa
 
   return (
     <div>
+      <TodoList leads={leads} />
+
       <div className="mb-6 flex space-x-2 space-x-reverse overflow-x-auto border-b border-white/10 pb-2">
         <button
           className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all ${

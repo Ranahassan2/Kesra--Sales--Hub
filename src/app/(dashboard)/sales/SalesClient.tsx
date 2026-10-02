@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import LeadTable from "@/components/LeadTable";
+import TodoList from "@/components/TodoList";
 
 export default function SalesClient({ leads }: { leads: any[] }) {
   const [activeTab, setActiveTab] = useState<"all" | "new" | "meetings_today" | "no_answer" | "followup" | "won" | "lost">("all");
@@ -77,6 +78,8 @@ export default function SalesClient({ leads }: { leads: any[] }) {
 
   return (
     <div>
+      <TodoList leads={leads} isSalesView={true} />
+
       <div className="mb-6 flex space-x-2 space-x-reverse overflow-x-auto border-b border-white/10 pb-2">
         {[
           { key: "all",           label: `الكل (${leads.length})`,                   color: "accent" },

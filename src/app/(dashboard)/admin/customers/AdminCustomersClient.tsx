@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import StatusBadge from "@/components/StatusBadge";
@@ -39,6 +39,10 @@ export default function AdminCustomersClient({
   const [isUploading, setIsUploading] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    setLeads(initialLeads);
+  }, [initialLeads]);
   
   // Custom Modal State
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: "alert" | "confirm"; onConfirm?: () => void }>({ isOpen: false, title: "", message: "", type: "alert" });
@@ -186,10 +190,19 @@ export default function AdminCustomersClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leads: mappedLeads, fileName, tier: previewTier }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "خطأ غير معروف");
       
       setPreviewData(null);
-      showAlert("تم بنجاح", `تم رفع ${mappedLeads.length} عميل بنجاح!`);
+
+      if (data.duplicates && data.duplicates.length > 0) {
+        const dupNames = data.duplicates.slice(0, 3).map((d: any) => d.name).join("، ");
+        const moreCount = data.duplicates.length > 3 ? ` و ${data.duplicates.length - 3} آخرين` : "";
+        showAlert("تم بنجاح مع وجود مكررين", `تم رفع ${data.count} عميل جديد بنجاح.\nتم استبعاد ${data.duplicates.length} عميل لأنهم مسجلين مسبقاً في النظام (مثل: ${dupNames}${moreCount}).`);
+      } else {
+        showAlert("تم بنجاح", `تم رفع ${data.count} عميل بنجاح!`);
+      }
+      
       router.refresh();
     } catch (error: any) {
       showAlert("خطأ", "حدث خطأ أثناء الرفع: " + error.message);
@@ -219,8 +232,14 @@ export default function AdminCustomersClient({
       
       if (assignTarget === "AUTO") {
         showAlert("تم بنجاح", `تم توزيع ${selectedLeads.size} عميل بالتساوي على موظفين التيلي سيلز بنجاح!`);
+        // For auto, we wait for router.refresh since we don't know exactly who got what, but we can clear them from UNASSIGNED
       } else {
         showAlert("تم بنجاح", `تم تحويل ${selectedLeads.size} عميل للموظف بنجاح!`);
+        // Optimistic update
+        const emp = employees.find(e => e.id === assignTarget);
+        if (emp) {
+          setLeads(prev => prev.map(l => selectedLeads.has(l.id) ? { ...l, assignedTo: emp, status: emp.role === "SALES" ? "TRANSFERRED_TO_SALES" : l.status } : l));
+        }
       }
       setSelectedLeads(new Set());
       setAssignTarget("");
@@ -292,6 +311,33 @@ export default function AdminCustomersClient({
     }
     return true;
   });
+
+  const handleExport = () => {
+    if (filteredLeads.length === 0) return showAlert("تنبيه", "لا يوجد بيانات لتصديرها.");
+    
+    const headers = ["الاسم", "رقم الهاتف", "الشركة", "الحالة", "التقييم", "الموظف المسؤول", "تاريخ الإضافة"];
+    const csvData = filteredLeads.map(l => [
+      l.name,
+      l.phone,
+      l.company || "",
+      l.status,
+      l.tier,
+      l.assignedTo?.name || "غير معين",
+      new Date(l.createdAt).toLocaleDateString("ar-EG")
+    ]);
+    
+    const csvContent = "\uFEFF" + [headers, ...csvData].map(row => 
+      row.map(item => `"${(item || "").toString().replace(/"/g, '""')}"`).join(",")
+    ).join("\n");
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Leads_Export_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6 relative">
@@ -548,8 +594,17 @@ export default function AdminCustomersClient({
         </div>
 
         {/* Bulk Actions */}
-        <div className="flex items-center gap-3 w-full xl:w-auto p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20">
-          <div className="text-sm text-indigo-300 font-bold px-2 whitespace-nowrap">
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20">
+          
+          <button 
+            onClick={handleExport}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors whitespace-nowrap flex items-center gap-2"
+            title="تصدير النتائج الحالية لإكسيل"
+          >
+            <span>📥</span> تصدير الداتا
+          </button>
+
+          <div className="text-sm text-indigo-300 font-bold px-2 whitespace-nowrap border-r border-indigo-500/30 pr-3">
             محدد: {selectedLeads.size}
           </div>
           <select 
@@ -659,6 +714,7 @@ export default function AdminCustomersClient({
           canDelete={canDelete}
           salesTeam={salesTeam as any}
           employees={employees as any}
+          allowExport={true}
         />
       )}
     </div>

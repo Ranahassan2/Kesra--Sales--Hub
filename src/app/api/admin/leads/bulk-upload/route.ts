@@ -18,17 +18,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid data format" }, { status: 400 });
     }
 
+    const incomingPhones = leads.map((l: any) => String(l.phone));
+    
+    const existingLeads = await prisma.lead.findMany({
+      where: { phone: { in: incomingPhones } },
+      select: { phone: true, name: true }
+    });
+
+    const existingPhonesSet = new Set(existingLeads.map(l => l.phone));
+    const newLeads = leads.filter((l: any) => !existingPhonesSet.has(String(l.phone)));
+
     // 1. Create an UploadBatch first to get its ID
     const batch = await prisma.uploadBatch.create({
       data: {
         fileName: fileName || "Untitled Sheet",
-        totalLeads: leads.length,
+        totalLeads: newLeads.length,
         uploadedById: session.user.id,
       },
     });
 
     // 2. Associate all leads with this batch
-    const dataToInsert = leads.map((l: any) => ({
+    const dataToInsert = newLeads.map((l: any) => ({
       name: l.name,
       phone: String(l.phone),
       email: l.email || null,
@@ -42,11 +52,18 @@ export async function POST(req: NextRequest) {
       uploadBatchId: batch.id,
     }));
 
-    await prisma.lead.createMany({
-      data: dataToInsert,
-    });
+    if (dataToInsert.length > 0) {
+      await prisma.lead.createMany({
+        data: dataToInsert,
+      });
+    }
 
-    return NextResponse.json({ success: true, count: dataToInsert.length, batchId: batch.id });
+    return NextResponse.json({ 
+      success: true, 
+      count: dataToInsert.length, 
+      batchId: batch.id,
+      duplicates: existingLeads
+    });
   } catch (error: any) {
     console.error("Bulk upload error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -107,6 +107,7 @@ export default function LeadTable({
   salesTeam,
   employees,
   isSalesView,
+  allowExport,
 }: {
   leads: LeadRow[];
   showAssignee?: boolean;
@@ -115,6 +116,7 @@ export default function LeadTable({
   salesTeam?: SalesOption[];
   employees?: { id: string; name: string; role: string }[];
   isSalesView?: boolean;
+  allowExport?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -319,6 +321,34 @@ export default function LeadTable({
     );
   }, [leads, search, filterStatus, filterAssignee, dateFilter]);
 
+  const handleExport = () => {
+    const headers = ["الاسم", "رقم الهاتف", "الحالة", "التقييم", "الموظف", "التاريخ", "الشركة", "الاحتياج"];
+    const csvData = filtered.map(l => [
+      l.name,
+      l.phone,
+      (isSalesView ? SALES_STATUS_OPTIONS : STATUS_LABELS_FOR_SELECT).find(s => s.value === (isSalesView ? l.salesStatus : l.status))?.label || l.status,
+      l.tier,
+      l.assignedTo?.name || "غير معين",
+      new Date(l.createdAt).toLocaleDateString("ar-EG"),
+      l.company || "",
+      l.need || ""
+    ]);
+    
+    // Add BOM (\uFEFF) for Arabic Excel support
+    const csvContent = "\uFEFF" + [headers, ...csvData].map(row => 
+      row.map(item => `"${(item || "").toString().replace(/"/g, '""')}"`).join(",")
+    ).join("\n");
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Leads_Export_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast("تم بدء التصدير بنجاح!", "success");
+  };
+
   const AVATAR_COLORS = [
     "bg-indigo-500", "bg-blue-500", "bg-emerald-500", "bg-orange-400", "bg-pink-500", "bg-yellow-500", "bg-purple-500"
   ];
@@ -426,19 +456,29 @@ export default function LeadTable({
             </div>
           </div>
 
-          {/* Add New Lead Button */}
-          {!isSalesView && (
-            <button 
-              onClick={() => setShowAddModal(true)}
-              className="bg-[#3b82f6] hover:bg-blue-600 text-white px-5 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center gap-2 shadow-sm w-full md:w-auto justify-center"
-            >
-              إضافة عميل جديد
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </button>
-          )}
+          {/* Add New Lead & Export Buttons */}
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            {allowExport && (
+              <button 
+                onClick={handleExport}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center gap-2 shadow-sm w-full md:w-auto justify-center"
+              >
+                تصدير إكسيل 📥
+              </button>
+            )}
+            {!isSalesView && (
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="bg-[#3b82f6] hover:bg-blue-600 text-white px-4 py-3.5 rounded-xl text-base font-medium transition-colors flex items-center gap-2 shadow-sm w-full md:w-auto justify-center"
+              >
+                إضافة عميل جديد
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

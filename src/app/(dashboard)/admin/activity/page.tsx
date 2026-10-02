@@ -53,7 +53,7 @@ export default async function ActivityLogPage({
   });
 
   return (
-    <DashboardShell title="سجل النشاط">
+    <DashboardShell title="متابعة الموظفين">
       <div className="mb-4 flex flex-wrap gap-2">
         <a
           href="/admin/activity"

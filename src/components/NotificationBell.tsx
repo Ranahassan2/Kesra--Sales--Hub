@@ -32,7 +32,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // Check every minute
+    const interval = setInterval(fetchNotifications, 10000); // Check every 10 seconds for real-time feel
     const handleRefresh = () => fetchNotifications();
     window.addEventListener("refreshNotifications", handleRefresh);
     
@@ -57,7 +57,19 @@ export default function NotificationBell() {
       const res = await fetch(`/api/notifications?t=${new Date().getTime()}`);
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data.notifications || []);
+        const newFetched = data.notifications || [];
+        
+        setNotifications((prev) => {
+          const hasNewAssignment = newFetched.some((n: any) => 
+            n.type === "ASSIGNMENT" && !prev.find((p) => p.id === n.id)
+          );
+          
+          if (hasNewAssignment) {
+            setTimeout(() => router.refresh(), 100);
+          }
+          
+          return newFetched;
+        });
       }
     } catch (e) {
       console.error(e);

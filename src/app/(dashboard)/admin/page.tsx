@@ -12,6 +12,7 @@ import {
   LeadsOverTimeChart,
 } from "@/components/ReportsCharts";
 import StaleLeadsChecker from "@/components/StaleLeadsChecker";
+import AdminTodoList from "@/components/AdminTodoList";
 
 export default async function AdminDashboard() {
   const session = await getServerSession(authOptions);
@@ -31,6 +32,8 @@ export default async function AdminDashboard() {
     tierGroups,
     team,
     recentLeads,
+    todayFollowUps,
+    todayMeetings,
   ] = await Promise.all([
     prisma.lead.count(),
     prisma.lead.count({ where: { tier: { in: ["HOT", "COLD"] } } }),
@@ -55,6 +58,30 @@ export default async function AdminDashboard() {
       where: { createdAt: { gte: since } },
       select: { createdAt: true },
     }),
+    prisma.followUp.findMany({
+      where: {
+        isCompleted: false,
+        scheduledDate: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          lt: new Date(new Date().setHours(23, 59, 59, 999)),
+        }
+      },
+      include: {
+        lead: { select: { id: true, name: true, phone: true, assignedTo: { select: { name: true } } } }
+      }
+    }),
+    prisma.meeting.findMany({
+      where: {
+        status: "SCHEDULED",
+        scheduledAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          lt: new Date(new Date().setHours(23, 59, 59, 999)),
+        }
+      },
+      include: {
+        lead: { select: { id: true, name: true, phone: true, assignedTo: { select: { name: true } } } }
+      }
+    }),
   ]);
 
   const teamWithActions = await Promise.all(
@@ -67,7 +94,20 @@ export default async function AdminDashboard() {
       });
       const actionCount = distinctLeads.length;
 
-      return { ...emp, actionCount };
+      // Count transferred to sales (Tele-Sales metric)
+      const transferredCount = await prisma.activity.count({
+        where: { userId: emp.id, type: "TRANSFERRED" }
+      });
+
+      // Count closed won/lost (Sales metric)
+      const wonCount = await prisma.lead.count({
+        where: { assignedToId: emp.id, status: "CLOSED_WON" }
+      });
+      const lostCount = await prisma.lead.count({
+        where: { assignedToId: emp.id, status: "CLOSED_LOST" }
+      });
+
+      return { ...emp, actionCount, transferredCount, wonCount, lostCount };
     })
   );
 
@@ -97,6 +137,9 @@ export default async function AdminDashboard() {
   return (
     <DashboardShell title="لوحة تحكم الإدارة">
       <StaleLeadsChecker />
+      
+      <AdminTodoList followUps={todayFollowUps} meetings={todayMeetings} />
+
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-6">
         <StatCard label="إجمالي الليدز" value={totalLeads} icon="📋" />
         <StatCard label="Hot / Cold" value={hotGold} icon="🔥" accent="text-status-hot" />
@@ -139,14 +182,36 @@ export default async function AdminDashboard() {
                 {emp.role === "TELE_SALES" ? "مبيعات هاتفية (Tele-Sales)" : (emp.role === "SALES" ? "مبيعات (Sales)" : emp.role)}
               </p>
               
-              <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/5">
-                <div>
-                  <p className="text-[10px] text-slate-500 font-medium">إجمالي الليدز</p>
-                  <p className="text-xl font-bold text-white mt-0.5">{emp._count.assignedLeads}</p>
+              <div className="flex flex-col gap-3 mt-3 pt-3 border-t border-white/5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-medium">إجمالي استلام</p>
+                    <p className="text-lg font-bold text-white mt-0.5">{emp._count.assignedLeads}</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] text-emerald-500/80 font-medium">تم اتخاذ أكشن</p>
+                    <p className="text-lg font-bold text-emerald-400 mt-0.5">{emp.actionCount}</p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="text-[10px] text-emerald-500/80 font-medium">تم اتخاذ أكشن</p>
-                  <p className="text-xl font-bold text-emerald-400 mt-0.5">{emp.actionCount}</p>
+                
+                <div className="flex items-center justify-between border-t border-white/[0.02] pt-2">
+                  {emp.role === "TELE_SALES" ? (
+                    <div className="text-right w-full">
+                      <p className="text-[10px] text-purple-500/80 font-medium">تحويل لـ السيلز</p>
+                      <p className="text-lg font-bold text-purple-400 mt-0.5">{emp.transferredCount}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-right">
+                        <p className="text-[10px] text-emerald-500/80 font-medium">صفقات ناجحة</p>
+                        <p className="text-lg font-bold text-emerald-400 mt-0.5">{emp.wonCount}</p>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-[10px] text-rose-500/80 font-medium">صفقات خاسرة</p>
+                        <p className="text-lg font-bold text-rose-400 mt-0.5">{emp.lostCount}</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
