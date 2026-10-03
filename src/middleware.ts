@@ -8,6 +8,7 @@ const ROUTE_ROLES: { prefix: string; roles: Role[] }[] = [
   { prefix: "/admin", roles: [Role.ADMIN, Role.HEAD_OF_SALES] },
   { prefix: "/tele-sales", roles: [Role.ADMIN, Role.HEAD_OF_SALES, Role.TELE_SALES] },
   { prefix: "/sales", roles: [Role.ADMIN, Role.HEAD_OF_SALES, Role.SALES] },
+  { prefix: "/account", roles: [Role.ADMIN] },
 ];
 
 export default withAuth(
