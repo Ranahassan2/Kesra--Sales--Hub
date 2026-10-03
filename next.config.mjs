@@ -1,16 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ["whatsapp-web.js", "puppeteer"],
+    // Next.js 14: externalize server-only packages from client bundle
+    serverComponentsExternalPackages: [
+      "whatsapp-web.js",
+      "puppeteer",
+      "puppeteer-core",
+    ],
     serverActions: {
       bodySizeLimit: "10mb",
     },
   },
   webpack: (config, { isServer }) => {
-    if (isServer) {
-      // whatsapp-web.js uses @aws-sdk/client-s3 only in RemoteAuth which we don't use
-      config.externals = [...(config.externals || []), "@aws-sdk/client-s3", "fluent-ffmpeg"];
-    }
+    // Prevent webpack from bundling Node.js-only packages on any side
+    config.externals = [
+      ...(config.externals || []),
+      "whatsapp-web.js",
+      "puppeteer",
+      "@aws-sdk/client-s3",
+      "fluent-ffmpeg",
+    ];
     return config;
   },
 };

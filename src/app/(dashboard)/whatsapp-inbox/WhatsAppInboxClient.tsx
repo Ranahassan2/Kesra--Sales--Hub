@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 
+// ─── Types ───────────────────────────────────────────────────────────────────
 type Chat = {
   id: string;
   name: string;
@@ -22,10 +23,15 @@ type Message = {
 
 type WaStatus = "DISCONNECTED" | "INITIALIZING" | "QR_READY" | "CONNECTED";
 
+type SlotInfo = {
+  id: string;      // "slot1", "slot2", ...
+  label: string;   // "واتساب 1", "واتساب 2", ...
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatTime(ts: number) {
   return new Date(ts * 1000).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
 }
-
 function formatChatTime(ts: number) {
   const d = new Date(ts * 1000);
   const diffDays = Math.floor((Date.now() - d.getTime()) / 86400000);
@@ -33,11 +39,9 @@ function formatChatTime(ts: number) {
   if (diffDays === 1) return "أمس";
   return d.toLocaleDateString("ar-EG", { month: "short", day: "numeric" });
 }
-
 function getInitials(name: string) {
   return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 }
-
 const COLORS = ["bg-indigo-500", "bg-emerald-500", "bg-rose-500", "bg-amber-500", "bg-sky-500", "bg-purple-500"];
 function avatarColor(id: string) {
   let h = 0;
@@ -45,10 +49,10 @@ function avatarColor(id: string) {
   return COLORS[Math.abs(h) % COLORS.length];
 }
 
-export default function WhatsAppInboxClient() {
-  const searchParams = useSearchParams();
-  const phoneQuery = searchParams.get("phone");
+const MAX_SLOTS = 5;
 
+// ─── Single WhatsApp Session Panel ───────────────────────────────────────────
+function WhatsAppPanel({ slotId, phoneQuery }: { slotId: string; phoneQuery: string | null }) {
   const [waStatus, setWaStatus] = useState<WaStatus>("DISCONNECTED");
   const [waQr, setWaQr] = useState<string | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -59,176 +63,165 @@ export default function WhatsAppInboxClient() {
   const [loadingChats, setLoadingChats] = useState(false);
   const [search, setSearch] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => { setMounted(true); }, []);
+  const qs = `slotId=${slotId}`;
 
+  // Initial load
   useEffect(() => {
-    const poll = async () => {
+    const init = async () => {
       try {
-        const r = await fetch(`/api/whatsapp/status?t=${Date.now()}`);
+        const r = await fetch(`/api/whatsapp/status?${qs}`);
         if (r.ok) { const d = await r.json(); setWaStatus(d.status); setWaQr(d.qrCodeBase64); }
       } catch {}
     };
-    poll();
-    const iv = setInterval(poll, 3000);
-    return () => clearInterval(iv);
-  }, []);
+    init();
+  }, [qs]);
 
+  // Load chats
   const loadChats = useCallback(async () => {
     if (waStatus !== "CONNECTED") return;
     setLoadingChats(true);
     try {
-      const r = await fetch("/api/whatsapp/chats");
+      const r = await fetch(`/api/whatsapp/chats?${qs}`);
       if (r.ok) { const d = await r.json(); setChats(d.chats || []); }
     } catch {} finally { setLoadingChats(false); }
-  }, [waStatus]);
+  }, [waStatus, qs]);
 
   useEffect(() => {
     loadChats();
-    const iv = setInterval(loadChats, 10000);
-    return () => clearInterval(iv);
   }, [loadChats]);
 
-  // Handle auto-selecting chat from URL
+  // Auto-select from URL phone param
   useEffect(() => {
     if (phoneQuery && chats.length > 0 && !selectedChat) {
       let formatted = phoneQuery.replace(/[^0-9]/g, "");
-      
-      // Remove leading "00" if user typed it (e.g., 00966 -> 966)
-      if (formatted.startsWith("00")) {
-        formatted = formatted.substring(2);
-      }
-      
-      // Add country code for Egypt numbers (Starts with 01, length 11 -> 201...)
-      if (formatted.startsWith("01") && formatted.length === 11) {
-        formatted = "2" + formatted;
-      }
-      // Add country code for Saudi numbers (Starts with 05, length 10 -> 9665...)
-      else if (formatted.startsWith("05") && formatted.length === 10) {
-        formatted = "966" + formatted.substring(1);
-      }
-      // Add country code for Saudi numbers (Starts with 5, length 9 -> 9665...)
-      else if (formatted.startsWith("5") && formatted.length === 9) {
-        formatted = "966" + formatted;
-      }
-      
-      // Look for a chat that contains this number
-      const matchingChat = chats.find(c => c.id.includes(formatted));
-      
+      if (formatted.startsWith("00")) formatted = formatted.substring(2);
+      if (formatted.startsWith("01") && formatted.length === 11) formatted = "2" + formatted;
+      else if (formatted.startsWith("05") && formatted.length === 10) formatted = "966" + formatted.substring(1);
+      else if (formatted.startsWith("5") && formatted.length === 9) formatted = "966" + formatted;
+      const matchingChat = chats.find((c) => c.id.includes(formatted));
       if (matchingChat) {
         setSelectedChat(matchingChat);
       } else {
-        // If chat doesn't exist yet, create a dummy one to allow sending first message
-        setSelectedChat({
-          id: `${formatted}@c.us`,
-          name: phoneQuery,
-          isGroup: false,
-          unreadCount: 0,
-          lastMessage: null,
-          timestamp: Math.floor(Date.now() / 1000)
-        });
+        setSelectedChat({ id: `${formatted}@c.us`, name: phoneQuery, isGroup: false, unreadCount: 0, lastMessage: null, timestamp: Math.floor(Date.now() / 1000) });
       }
     }
   }, [phoneQuery, chats, selectedChat]);
 
+  // Load messages
   const loadMessages = useCallback(async () => {
     if (!selectedChat) return;
     try {
-      const r = await fetch(`/api/whatsapp/chats/${encodeURIComponent(selectedChat.id)}`);
+      const r = await fetch(`/api/whatsapp/chats/${encodeURIComponent(selectedChat.id)}?${qs}`);
       if (r.ok) { const d = await r.json(); setMessages(d.messages || []); }
     } catch {}
-  }, [selectedChat]);
+  }, [selectedChat, qs]);
 
   useEffect(() => {
     if (!selectedChat) return;
     loadMessages();
-    const iv = setInterval(loadMessages, 5000);
-    return () => clearInterval(iv);
   }, [loadMessages, selectedChat]);
+
+  // SSE (Server-Sent Events) for real-time updates without polling
+  useEffect(() => {
+    const eventSource = new EventSource(`/api/whatsapp/events?${qs}`);
+    
+    eventSource.addEventListener("status", (e) => {
+      const data = JSON.parse(e.data);
+      setWaStatus(data.status);
+      if (data.qrCodeBase64) setWaQr(data.qrCodeBase64);
+    });
+
+    eventSource.addEventListener("chats_update", () => {
+      loadChats();
+    });
+
+    eventSource.addEventListener("message", (e) => {
+      const data = JSON.parse(e.data);
+      setSelectedChat(prevSelected => {
+        if (prevSelected && data.chatId === prevSelected.id) {
+          setMessages(prev => {
+            // Prevent duplicates
+            if (prev.some(m => m.id === data.id)) return prev;
+            return [...prev, data];
+          });
+        }
+        return prevSelected;
+      });
+    });
+
+    return () => eventSource.close();
+  }, [qs, loadChats]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleLogout = async () => {
-    if (!confirm("هل أنت متأكد أنك تريد تسجيل الخروج من واتساب؟ ستحتاج إلى مسح رمز الـ QR مرة أخرى.")) return;
+    if (!confirm("هل أنت متأكد أنك تريد تسجيل الخروج من واتساب؟")) return;
     try {
-      setWaStatus("INITIALIZING"); // Show loading state briefly
-      await fetch("/api/whatsapp/logout", { method: "POST" });
+      setWaStatus("INITIALIZING");
+      await fetch(`/api/whatsapp/logout?${qs}`, { method: "POST" });
       setWaStatus("DISCONNECTED");
       setWaQr(null);
-    } catch (e) {
-      console.error(e);
-      alert("حدث خطأ أثناء تسجيل الخروج");
-    }
+      setChats([]);
+      setSelectedChat(null);
+      setMessages([]);
+    } catch { alert("حدث خطأ أثناء تسجيل الخروج"); }
   };
 
   const handleSend = async () => {
     if (!selectedChat || !newMsg.trim()) return;
-    
-    // Optimistic update
     const tempId = `temp-${Date.now()}`;
-    const optimisticMsg: Message = {
-      id: tempId,
-      body: newMsg,
-      fromMe: true,
-      timestamp: Math.floor(Date.now() / 1000),
-      type: "chat"
-    };
-    
-    setMessages(prev => [...prev, optimisticMsg]);
+    const optimisticMsg: Message = { id: tempId, body: newMsg, fromMe: true, timestamp: Math.floor(Date.now() / 1000), type: "chat" };
+    setMessages((prev) => [...prev, optimisticMsg]);
     const messageToSend = newMsg;
     setNewMsg("");
     setSending(true);
-
     try {
-      await fetch(`/api/whatsapp/chats/${encodeURIComponent(selectedChat.id)}`, {
+      await fetch(`/api/whatsapp/chats/${encodeURIComponent(selectedChat.id)}?${qs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: messageToSend }),
       });
-      // The background poll will re-fetch the correct messages
       await loadMessages();
     } catch {
-      // Revert if failed (optional, but good UX)
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-    } finally { 
-      setSending(false); 
-    }
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    } finally { setSending(false); }
   };
 
-  const filtered = chats.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = chats.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
 
-  if (!mounted) return null;
-
-  return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-160px)] w-full max-w-6xl mx-auto relative overflow-hidden min-h-0">
-      {/* NOT CONNECTED */}
-      {waStatus !== "CONNECTED" && (
-        <div className="m-auto max-w-md bg-[#121927] border border-white/10 rounded-2xl p-8 text-center shadow-2xl">
+  // ── NOT CONNECTED ──
+  if (waStatus !== "CONNECTED") {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="max-w-md w-full bg-[#121927] border border-white/10 rounded-2xl p-8 text-center shadow-2xl">
           {waStatus === "DISCONNECTED" && (
             <>
-              <div className="text-5xl mb-4">💬</div>
+              <div className="text-6xl mb-4">💬</div>
               <h2 className="text-xl font-bold text-white mb-2">الواتساب غير مرتبط</h2>
               <p className="text-slate-400 mb-6">اضغط لتوليد رمز QR وربط حسابك</p>
               <button
-                onClick={() => fetch("/api/whatsapp/status", { method: "POST" })}
-                className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-xl transition-colors"
-              >توليد رمز QR</button>
+                id={`btn-generate-qr-${slotId}`}
+                onClick={() => fetch(`/api/whatsapp/status?${qs}`, { method: "POST" })}
+                className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-xl transition-all duration-200 shadow-lg hover:shadow-green-500/30 hover:scale-105"
+              >
+                توليد رمز QR
+              </button>
             </>
           )}
           {waStatus === "INITIALIZING" && (
             <>
-              <div className="w-12 h-12 border-4 border-green-500/20 border-t-green-500 rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-green-400 font-bold">جاري تجهيز رمز QR...</p>
+              <div className="w-14 h-14 border-4 border-green-500/20 border-t-green-500 rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-green-400 font-bold text-lg">جاري تجهيز رمز QR...</p>
               <p className="text-sm text-slate-400 mt-2">يرجى الانتظار بضع ثوانٍ</p>
             </>
           )}
           {waStatus === "QR_READY" && waQr && (
             <>
               <h2 className="text-xl font-bold text-white mb-4">امسح الرمز من موبايلك</h2>
-              <div className="bg-white p-3 rounded-2xl inline-block mb-4">
+              <div className="bg-white p-3 rounded-2xl inline-block mb-4 shadow-xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={waQr} alt="QR" width={240} height={240} />
               </div>
@@ -240,124 +233,211 @@ export default function WhatsAppInboxClient() {
             </>
           )}
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* CONNECTED INBOX */}
-      {waStatus === "CONNECTED" && (
-        <div className="flex gap-0 rounded-2xl overflow-hidden border border-white/10 shadow-2xl w-full h-full bg-[#121927] min-h-0">
-          {/* Sidebar */}
-          <div className="w-80 min-w-[320px] bg-[#0f1523] border-l border-white/10 flex flex-col z-10 flex-shrink-0 h-full">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <span className="text-white font-bold flex items-center gap-2">
-                <span className="text-green-400">💬</span> المحادثات
-              </span>
-              <div className="flex items-center gap-3">
-                <button onClick={loadChats} className="text-slate-400 hover:text-white text-xs transition-colors">
-                  {loadingChats ? "⟳ جاري..." : "⟳ تحديث"}
-                </button>
-                <button onClick={handleLogout} className="text-rose-400 hover:text-rose-300 text-xs transition-colors border border-rose-500/30 px-2 py-1 rounded-md bg-rose-500/10">
-                  خروج
-                </button>
-              </div>
+  // ── CONNECTED INBOX ──
+  return (
+    <div className="flex gap-0 rounded-b-2xl overflow-hidden border border-t-0 border-white/10 shadow-2xl w-full flex-1 bg-[#121927] min-h-0" style={{ height: "calc(100vh - 220px)" }}>
+      {/* Sidebar */}
+      <div className="w-80 min-w-[300px] bg-[#0f1523] border-l border-white/10 flex flex-col z-10 flex-shrink-0 h-full">
+        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+          <span className="text-white font-bold flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse inline-block" />
+            المحادثات
+          </span>
+          <div className="flex items-center gap-3">
+            <button onClick={loadChats} className="text-slate-400 hover:text-white text-xs transition-colors">
+              {loadingChats ? "⟳ جاري..." : "⟳ تحديث"}
+            </button>
+            <button onClick={handleLogout} className="text-rose-400 hover:text-rose-300 text-xs transition-colors border border-rose-500/30 px-2 py-1 rounded-md bg-rose-500/10">
+              خروج
+            </button>
+          </div>
+        </div>
+        <div className="p-3 border-b border-white/5">
+          <input
+            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="🔍 بحث..."
+            className="w-full bg-[#182032] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {filtered.length === 0
+            ? <p className="text-center text-slate-500 text-sm py-8">لا توجد محادثات</p>
+            : filtered.map((chat) => (
+              <button key={chat.id} onClick={() => { setSelectedChat(chat); setMessages([]); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors text-right ${selectedChat?.id === chat.id ? "bg-white/10 border-r-2 border-r-green-500" : ""}`}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${avatarColor(chat.id)}`}>
+                  {chat.isGroup ? "👥" : getInitials(chat.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-white text-[15px] font-semibold truncate">{chat.name}</span>
+                    {chat.timestamp > 0 && <span className="text-slate-500 text-[11px] flex-shrink-0 mr-2">{formatChatTime(chat.timestamp)}</span>}
+                  </div>
+                  {chat.lastMessage && (
+                    <p className="text-slate-400 text-xs truncate flex items-center gap-1">
+                      {chat.lastMessage.fromMe && <span className="text-green-400 text-[10px]">✓✓</span>}
+                      {chat.lastMessage.body}
+                    </p>
+                  )}
+                </div>
+                {chat.unreadCount > 0 && <span className="bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full">{chat.unreadCount}</span>}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      {/* Messages Area */}
+      {!selectedChat ? (
+        <div className="flex-1 bg-[#121927] flex items-center justify-center min-w-0 h-full">
+          <div className="text-center text-slate-500">
+            <div className="text-6xl mb-4">💬</div>
+            <p className="text-xl font-bold text-white mb-2">واتساب ويب</p>
+            <p className="text-sm">اختر محادثة للبدء في المراسلة</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col bg-[#121927] relative min-w-0 overflow-hidden h-full min-h-0">
+          {/* Chat Header */}
+          <div className="h-[72px] min-h-[72px] p-4 border-b border-white/10 flex items-center gap-4 bg-[#0f1523] z-10 flex-shrink-0">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${avatarColor(selectedChat.id)}`}>
+              {selectedChat.isGroup ? "👥" : getInitials(selectedChat.name)}
             </div>
-            <div className="p-3 border-b border-white/5">
-              <input
-                type="text" value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="🔍 بحث..."
-                className="w-full bg-[#182032] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
-              />
-            </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-              {filtered.length === 0
-                ? <p className="text-center text-slate-500 text-sm py-8">لا توجد محادثات</p>
-                : filtered.map(chat => (
-                  <button key={chat.id} onClick={() => { setSelectedChat(chat); setMessages([]); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors text-right ${selectedChat?.id === chat.id ? "bg-white/10 border-r-2 border-r-green-500" : ""}`}
-                  >
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${avatarColor(chat.id)}`}>
-                      {chat.isGroup ? "👥" : getInitials(chat.name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-white text-[15px] font-semibold truncate">{chat.name}</span>
-                        {chat.timestamp > 0 && <span className="text-slate-500 text-[11px] flex-shrink-0 mr-2">{formatChatTime(chat.timestamp)}</span>}
-                      </div>
-                      {chat.lastMessage && (
-                        <p className="text-slate-400 text-xs truncate flex items-center gap-1">
-                          {chat.lastMessage.fromMe && <span className="text-green-400 text-[10px]">✓✓</span>}
-                          {chat.lastMessage.body}
-                        </p>
-                      )}
-                    </div>
-                    {chat.unreadCount > 0 && <span className="bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full">{chat.unreadCount}</span>}
-                  </button>
-                ))
-              }
+            <div className="min-w-0 flex-1">
+              <p className="text-white font-bold text-[15px] truncate">{selectedChat.name}</p>
+              <p className="text-slate-400 text-[11px]" dir="ltr">{selectedChat.id.split("@")[0]}</p>
             </div>
           </div>
 
-          {/* Messages Area */}
-          {!selectedChat ? (
-            <div className="flex-1 bg-[#121927] flex items-center justify-center min-w-0 h-full">
-              <div className="text-center text-slate-500">
-                <div className="text-6xl mb-4">💬</div>
-                <p className="text-xl font-bold text-white mb-2">واتساب ويب</p>
-                <p className="text-sm">اختر محادثة للبدء في المراسلة</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col bg-[#121927] relative min-w-0 overflow-hidden h-full min-h-0">
-              {/* Chat Header */}
-              <div className="h-[72px] min-h-[72px] p-4 border-b border-white/10 flex items-center gap-4 bg-[#0f1523] z-10 flex-shrink-0 w-full">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${avatarColor(selectedChat.id)}`}>
-                  {selectedChat.isGroup ? "👥" : getInitials(selectedChat.name)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-white font-bold text-[15px] truncate">{selectedChat.name}</p>
-                  <p className="text-slate-400 text-[11px]" dir="ltr">{selectedChat.id.split('@')[0]}</p>
-                </div>
-              </div>
-
-              {/* Chat Messages */}
-              <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-4 bg-[#121927] custom-scrollbar w-full min-h-0">
-                {messages.map(msg => (
-                  <div key={msg.id} className={`flex ${msg.fromMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-md relative break-words ${msg.fromMe ? "bg-[#005c4b] text-white rounded-br-sm" : "bg-[#202c33] text-white rounded-bl-sm"}`}>
-                      <p className="whitespace-pre-wrap leading-relaxed mb-1 break-words">{msg.body || <em className="opacity-50">[ميديا]</em>}</p>
-                      <div className="flex items-center justify-end gap-1">
-                        <p className={`text-[10px] ${msg.fromMe ? "text-green-200" : "text-slate-400"}`}>{formatTime(msg.timestamp)}</p>
-                        {msg.fromMe && <span className="text-blue-400 text-[10px]">✓✓</span>}
-                      </div>
-                    </div>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-4 bg-[#121927] custom-scrollbar w-full min-h-0">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.fromMe ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-md break-words ${msg.fromMe ? "bg-[#005c4b] text-white rounded-br-sm" : "bg-[#202c33] text-white rounded-bl-sm"}`}>
+                  <p className="whitespace-pre-wrap leading-relaxed mb-1 break-words">{msg.body || <em className="opacity-50">[ميديا]</em>}</p>
+                  <div className="flex items-center justify-end gap-1">
+                    <p className={`text-[10px] ${msg.fromMe ? "text-green-200" : "text-slate-400"}`}>{formatTime(msg.timestamp)}</p>
+                    {msg.fromMe && <span className="text-blue-400 text-[10px]">✓✓</span>}
                   </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Chat Input */}
-              <div className="p-4 border-t border-white/10 bg-[#0f1523] z-10 flex-shrink-0">
-                <div className="flex gap-3 items-center">
-                  <input
-                    type="text" value={newMsg} onChange={e => setNewMsg(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleSend(); }}}
-                    placeholder="اكتب رسالة..."
-                    className="flex-1 bg-[#182032] border border-white/10 rounded-xl px-4 py-3.5 text-white text-[15px] placeholder-slate-500 focus:outline-none focus:border-[#00a884] transition-colors shadow-inner"
-                  />
-                  <button onClick={handleSend} disabled={sending || !newMsg.trim()}
-                    className="bg-[#00a884] hover:bg-[#008f6f] text-white p-3.5 rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center justify-center shadow-lg"
-                  >
-                    {sending ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : (
-                      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-                        <path d="M1.101 21.757 23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"></path>
-                      </svg>
-                    )}
-                  </button>
                 </div>
               </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="p-4 border-t border-white/10 bg-[#0f1523] z-10 flex-shrink-0">
+            <div className="flex gap-3 items-center">
+              <input
+                type="text" value={newMsg} onChange={(e) => setNewMsg(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSend(); } }}
+                placeholder="اكتب رسالة..."
+                className="flex-1 bg-[#182032] border border-white/10 rounded-xl px-4 py-3.5 text-white text-[15px] placeholder-slate-500 focus:outline-none focus:border-[#00a884] transition-colors shadow-inner"
+              />
+              <button onClick={handleSend} disabled={sending || !newMsg.trim()}
+                className="bg-[#00a884] hover:bg-[#008f6f] text-white p-3.5 rounded-xl font-bold transition-all duration-200 disabled:opacity-50 flex items-center justify-center shadow-lg hover:scale-105"
+              >
+                {sending ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : (
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                    <path d="M1.101 21.757 23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z" />
+                  </svg>
+                )}
+              </button>
             </div>
-          )}
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function WhatsAppInboxClient() {
+  const searchParams = useSearchParams();
+  const phoneQuery = searchParams.get("phone");
+
+  const [mounted, setMounted] = useState(false);
+  const [slots, setSlots] = useState<SlotInfo[]>([{ id: "slot1", label: "واتساب 1" }]);
+  const [activeSlot, setActiveSlot] = useState("slot1");
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const addSlot = () => {
+    if (slots.length >= MAX_SLOTS) return;
+    const newIndex = slots.length + 1;
+    const newSlot: SlotInfo = { id: `slot${newIndex}`, label: `واتساب ${newIndex}` };
+    setSlots((prev) => [...prev, newSlot]);
+    setActiveSlot(newSlot.id);
+  };
+
+  const removeSlot = (slotId: string) => {
+    if (slots.length === 1) return; // keep at least one
+    const updated = slots.filter((s) => s.id !== slotId);
+    if (updated.length === 0) return; // safety guard
+    setSlots(updated);
+    if (activeSlot === slotId) setActiveSlot(updated[0].id);
+  };
+
+  if (!mounted) return null;
+
+  return (
+    <div className="flex flex-col h-full w-full max-w-6xl mx-auto" style={{ minHeight: "calc(100vh - 160px)" }}>
+      {/* Tabs Bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {slots.map((slot) => (
+          <div key={slot.id} className="flex items-center">
+            <button
+              id={`tab-${slot.id}`}
+              onClick={() => setActiveSlot(slot.id)}
+              className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-semibold transition-all duration-200 border border-b-0
+                ${activeSlot === slot.id
+                  ? "bg-[#121927] border-white/20 text-white shadow-lg"
+                  : "bg-[#0a0f1a] border-transparent text-slate-500 hover:text-slate-300 hover:bg-[#0f1523]"
+                }`}
+            >
+              <span>💬</span>
+              <span>{slot.label}</span>
+              {slots.length > 1 && (
+                <span
+                  role="button"
+                  onClick={(e) => { e.stopPropagation(); removeSlot(slot.id); }}
+                  className="ml-1 text-slate-500 hover:text-rose-400 transition-colors text-xs leading-none"
+                  title="إزالة"
+                >
+                  ✕
+                </span>
+              )}
+            </button>
+          </div>
+        ))}
+
+        {/* Add new slot button */}
+        {slots.length < MAX_SLOTS && (
+          <button
+            id="btn-add-whatsapp-slot"
+            onClick={addSlot}
+            className="flex items-center gap-2 px-4 py-3 rounded-t-xl text-sm font-semibold text-slate-400 hover:text-white border border-transparent hover:border-white/10 hover:bg-[#0f1523] transition-all duration-200"
+            title="إضافة رقم واتساب جديد"
+          >
+            <span className="text-lg leading-none">+</span>
+            <span>إضافة رقم</span>
+          </button>
+        )}
+      </div>
+
+      {/* Active Panel */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {slots.map((slot) => (
+          <div key={slot.id} className={activeSlot === slot.id ? "flex flex-col flex-1 min-h-0" : "hidden"}>
+            <WhatsAppPanel slotId={slot.id} phoneQuery={activeSlot === slot.id ? phoneQuery : null} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

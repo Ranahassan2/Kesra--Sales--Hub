@@ -42,9 +42,27 @@ export const initializeWhatsApp = (userId: string) => {
     authStrategy: new LocalAuth({ clientId: userId }),
     puppeteer: {
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      executablePath:
+        process.env.PUPPETEER_EXECUTABLE_PATH ||
+        "/usr/bin/google-chrome",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
     },
   });
+
+  const broadcastEvent = (event: string, data: any) => {
+    const clients = (global as any).waSSEClients?.get(userId) || [];
+    const encoder = new TextEncoder();
+    clients.forEach((writer: any) => {
+      try {
+        writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      } catch (e) {}
+    });
+  };
 
   client.on("qr", async (qr) => {
     try {
@@ -52,6 +70,7 @@ export const initializeWhatsApp = (userId: string) => {
       state.qrCodeBase64 = base64Image;
       state.status = "QR_READY";
       console.log(`WhatsApp QR Code is ready for user ${userId}.`);
+      broadcastEvent("status", { status: state.status, qrCodeBase64: state.qrCodeBase64 });
     } catch (e) {
       console.error(`Failed to generate QR code for user ${userId}`, e);
     }
@@ -61,24 +80,56 @@ export const initializeWhatsApp = (userId: string) => {
     console.log(`WhatsApp is connected and ready for user ${userId}!`);
     state.status = "CONNECTED";
     state.qrCodeBase64 = null;
+    broadcastEvent("status", { status: state.status });
+    broadcastEvent("chats_update", { force: true });
   });
 
   client.on("disconnected", () => {
     console.log(`WhatsApp disconnected for user ${userId}`);
     state.status = "DISCONNECTED";
     state.client = undefined;
+    broadcastEvent("status", { status: state.status });
   });
   
   client.on("auth_failure", () => {
     console.log(`WhatsApp auth failed for user ${userId}`);
     state.status = "DISCONNECTED";
     state.qrCodeBase64 = null;
+    broadcastEvent("status", { status: state.status });
+  });
+
+  // Listen to incoming messages to trigger UI updates
+  client.on("message", async (msg) => {
+    broadcastEvent("message", {
+      id: msg.id._serialized,
+      body: msg.body,
+      fromMe: msg.fromMe,
+      timestamp: msg.timestamp,
+      type: msg.type,
+      chatId: msg.from,
+    });
+    broadcastEvent("chats_update", { force: true });
+  });
+  
+  client.on("message_create", async (msg) => {
+    if (msg.fromMe) {
+      broadcastEvent("message", {
+        id: msg.id._serialized,
+        body: msg.body,
+        fromMe: msg.fromMe,
+        timestamp: msg.timestamp,
+        type: msg.type,
+        chatId: msg.to,
+      });
+      broadcastEvent("chats_update", { force: true });
+    }
   });
 
   client.initialize().catch((e) => {
     console.error(`Failed to initialize WhatsApp client for user ${userId}:`, e);
     state.status = "DISCONNECTED";
     state.client = undefined;
+    broadcastEvent("status", { status: state.status });
   });
 
   state.client = client;
