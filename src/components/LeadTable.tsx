@@ -636,18 +636,62 @@ export default function LeadTable({
                 </div>
 
                 {/* Actions */}
-                <div className="mt-2 pt-4 flex gap-3 border-t border-white/[0.03]">
+                <div className="mt-2 pt-4 flex gap-2 border-t border-white/[0.03]">
                   <a 
                     href={`/whatsapp-inbox?phone=${lead.phone}`}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 text-[13px] transition-colors text-center flex items-center justify-center gap-2 font-semibold shadow-[0_4px_12px_rgba(79,70,229,0.3)]"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 text-[13px] transition-colors text-center flex items-center justify-center gap-1.5 font-semibold shadow-[0_4px_12px_rgba(79,70,229,0.3)]"
                   >
                     واتساب 💬
                   </a>
                   <button 
                     onClick={() => { setOpenId(lead.id); setModalMode("details"); }} 
-                    className="flex-1 bg-[#1f2937] hover:bg-[#374151] text-slate-300 rounded-xl py-3 text-[13px] transition-colors font-semibold"
+                    className="flex-[0.8] bg-[#1f2937] hover:bg-[#374151] text-slate-300 rounded-xl py-3 text-[13px] transition-colors font-semibold"
                   >
-                    عرض التفاصيل
+                    التفاصيل
+                  </button>
+                  <a 
+                    href="https://meet.google.com/new"
+                    target="_blank" rel="noopener noreferrer"
+                    onClick={() => {
+                      call(`/api/leads/${lead.id}/activity`, "POST", {
+                        type: "MEETING",
+                        message: "بدأ الموظف ميتنج جوجل فوري (Google Meet) مع العميل"
+                      }).catch(() => {});
+                    }}
+                    className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl w-10 flex items-center justify-center transition-colors"
+                    title="ميتنج جوجل"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                  </a>
+                  <a 
+                    href="https://zoom.us/meeting/schedule"
+                    target="_blank" rel="noopener noreferrer"
+                    onClick={() => {
+                      call(`/api/leads/${lead.id}/activity`, "POST", {
+                        type: "MEETING",
+                        message: "قام الموظف بإنشاء غرفة ميتنج زوم (Zoom) للعميل"
+                      }).catch(() => {});
+                    }}
+                    className="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-xl w-10 flex items-center justify-center transition-colors"
+                    title="ميتنج زوم"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 10.655V8.5A1.5 1.5 0 0 0 14.5 7h-11A1.5 1.5 0 0 0 2 8.5v8A1.5 1.5 0 0 0 3.5 18h11a1.5 1.5 0 0 0 1.5-1.5v-2.155l4.636 3.161A.5.5 0 0 0 22 17.094V7.906a.5.5 0 0 0-.78-.415L16 10.655z"/></svg>
+                  </a>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const jitsiUrl = `https://meet.jit.si/Telesales_${lead.phone}_${Math.floor(Date.now() / 1000)}`;
+                      localStorage.setItem(`jitsi_${lead.id}`, jitsiUrl);
+                      call(`/api/leads/${lead.id}/activity`, "POST", {
+                        type: "MEETING",
+                        message: `قام الموظف بإنشاء غرفة Jitsi للعميل: ${jitsiUrl}`
+                      }).catch(() => {});
+                      window.open(jitsiUrl, "_blank");
+                    }}
+                    className="bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 rounded-xl w-10 flex items-center justify-center transition-colors"
+                    title="Jitsi (ميتنج أوتوماتيك)"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15.6 11.6L22 7v10l-6.4-4.5v-1z"/><circle cx="8" cy="12" r="5"/></svg>
                   </button>
                 </div>
               </div>
@@ -936,8 +980,14 @@ function LeadActions({
           }
         })
         .catch(() => {});
+        
+      // Auto-fill Jitsi link if it exists
+      const savedJitsi = localStorage.getItem(`jitsi_${lead.id}`);
+      if (savedJitsi && !meetingNotes.includes(savedJitsi)) {
+        setMeetingNotes(prev => prev ? `${prev}\n\nرابط الميتنج الفوري: ${savedJitsi}` : `رابط الميتنج الفوري: ${savedJitsi}`);
+      }
     }
-  }, [mode, allowTransfer]);
+  }, [mode, allowTransfer, lead.id]); // only re-run when mode changes
 
   return (
     <div className="space-y-6">
