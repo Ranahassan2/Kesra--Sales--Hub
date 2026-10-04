@@ -79,7 +79,7 @@ export default async function ReportsPage() {
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label="إجمالي الليدز" value={totalLeads} icon="📋" />
         <StatCard label="تم التحويل لـ Sales" value={transferred} icon="🤝" />
-        <StatCard label="صفقات ناجحة" value={closedWon} icon="✅" accent="text-status-won" />
+        <StatCard label="العقود" value={closedWon} icon="✅" accent="text-status-won" />
         <StatCard label="نسبة التحويل لصفقة" value={`${conversionRate}%`} icon="📈" accent="text-accent-soft" />
       </div>
 

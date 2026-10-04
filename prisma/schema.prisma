@@ -64,6 +64,7 @@ model Lead {
   notes          String?
   storeUrl       String? // لينك متجر العميل
   socialMediaUrl String? // رابط السوشيال ميديا
+  contractUrl    String? // رابط العقد المرفوع
 
   status String @default("NEW")
   salesStatus String?

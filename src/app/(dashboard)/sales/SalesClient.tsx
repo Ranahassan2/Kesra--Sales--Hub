@@ -84,7 +84,7 @@ export default function SalesClient({ leads }: { leads: any[] }) {
         {[
           { key: "all",           label: `الكل (${leads.length})`,                   color: "accent" },
           { key: "new",           label: `جديد (${newLeads.length})`,              color: "blue" },
-          { key: "meetings_today",label: `مقابلات اليوم (${todaysMeetings.length})`, color: "accent" },
+          { key: "meetings_today",label: `مواعيد الميتنج اليوم (${todaysMeetings.length})`, color: "accent" },
           { key: "no_answer",     label: `لا يرد/غير متاح (${noAnswerLeads.length})`,color: "yellow" },
           { key: "followup",      label: `يحتاج متابعة (${followupLeads.length})`, color: "purple" },
           { key: "won",           label: `ناجح (${wonLeads.length})`,              color: "won" },

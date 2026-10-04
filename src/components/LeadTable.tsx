@@ -44,6 +44,7 @@ export interface LeadRow {
   salesNotes?: string | null;
   storeUrl?: string | null;
   socialMediaUrl?: string | null;
+  contractUrl?: string | null;
   status: string;
   salesStatus: string;
   tier: string;
@@ -121,7 +122,7 @@ export default function LeadTable({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [openId, setOpenId] = useState<string | null>(null);
-  const [modalMode, setModalMode] = useState<"edit" | "details" | "status" | "task" | "transfer" | "meeting-result">("details");
+  const [modalMode, setModalMode] = useState<"edit" | "details" | "status" | "task" | "transfer" | "meeting-result" | "upload-contract">("details");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -535,9 +536,15 @@ export default function LeadTable({
                               <span>📅</span> إضافة متابعة مع العميل
                             </button>
 
-                            {isSalesView && lead.meetings?.[0]?.status === "SCHEDULED" && (
+                            {isSalesView && (
                               <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("meeting-result"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-emerald-400 hover:bg-emerald-500/20 transition-colors text-right w-full border-t border-white/5 font-semibold">
-                                <span>✅</span> إنهاء المقابلة وكتابة التقرير
+                                <span>📝</span> تقرير بعد الميتنج
+                              </button>
+                            )}
+
+                            {isSalesView && (
+                              <button onClick={(e) => { e.stopPropagation(); setOpenId(lead.id); setModalMode("upload-contract"); setOpenDropdown(null); }} className="flex items-center gap-3 px-4 py-2.5 text-sm text-blue-400 hover:bg-blue-500/20 transition-colors text-right w-full border-t border-white/5 font-semibold">
+                                <span>📄</span> رفع عقد العميل
                               </button>
                             )}
 
@@ -914,7 +921,7 @@ function LeadActions({
   isSalesView,
 }: {
   lead: LeadRow;
-  mode: "edit" | "details" | "status" | "task" | "transfer" | "meeting-result";
+  mode: "edit" | "details" | "status" | "task" | "transfer" | "meeting-result" | "upload-contract";
   busy: boolean;
   allowTransfer?: boolean;
   canDelete?: boolean;
@@ -939,9 +946,12 @@ function LeadActions({
   const [transferError, setTransferError] = useState("");
   const [meetingDate, setMeetingDate] = useState("");
   const [meetingNotes, setMeetingNotes] = useState("");
+  const [meetingResultNotes, setMeetingResultNotes] = useState("");
   const [selectedSales, setSelectedSales] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [storeUrls, setStoreUrls] = useState<string[]>(
     lead.storeUrl ? lead.storeUrl.split(',').filter(Boolean) : [""]
   );
@@ -1269,7 +1279,7 @@ function LeadActions({
         </div>
       )}
 
-      {mode === "meeting-result" && isSalesView && lead.meetings?.[0] && (
+      {mode === "meeting-result" && isSalesView && (
         <div className="space-y-4 max-w-sm mx-auto">
           <div className="space-y-2 mt-2">
             <p className="text-sm font-semibold text-slate-400">نتيجة المقابلة وملاحظات السيلز</p>
@@ -1285,11 +1295,15 @@ function LeadActions({
             disabled={busy || saved || !meetingResult.trim()}
             onClick={async () => {
               try {
-                await onMeetingUpdate({
-                  meetingId: lead.meetings![0].id,
-                  status: "DONE",
-                  result: meetingResult
-                });
+                if (lead.meetings?.[0]) {
+                  await onMeetingUpdate({
+                    meetingId: lead.meetings[0].id,
+                    status: "DONE",
+                    result: meetingResult
+                  });
+                }
+                // Always save to salesNotes too so it's visible on the lead
+                await onEditDetails({ salesNotes: meetingResult });
                 await onStatus("MEETING_DONE");
                 setSaved(true);
                 setTimeout(() => {
@@ -1302,6 +1316,60 @@ function LeadActions({
             className={`w-full text-sm py-3 mt-4 transition-colors ${saved ? 'bg-emerald-500 text-white rounded-xl shadow-lg font-semibold' : 'btn-primary'}`}
           >
             {saved ? "تم حفظ التقرير بنجاح ✓" : "إنهاء المقابلة وحفظ التقرير"}
+          </button>
+        </div>
+      )}
+
+      {mode === "upload-contract" && isSalesView && (
+        <div className="space-y-4 max-w-sm mx-auto">
+          <div className="space-y-2 mt-2">
+            <p className="text-sm font-semibold text-slate-400">رفع العقد الخاص بالعميل</p>
+            {lead.contractUrl && (
+              <div className="flex flex-col gap-2 mb-4 mt-2">
+                {lead.contractUrl.split(',').filter(Boolean).map((url, idx) => (
+                  <a key={idx} href={url} target="_blank" className="flex items-center justify-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded-xl py-2.5 px-4 text-sm font-semibold transition-colors">
+                    <span>📄</span> عرض العقد رقم {idx + 1}
+                  </a>
+                ))}
+              </div>
+            )}
+            <input
+              type="file"
+              accept=".pdf,image/*"
+              className="input-field text-sm w-full py-2"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setUploadFile(e.target.files[0]);
+                }
+              }}
+            />
+          </div>
+          <button
+            disabled={busy || saved || uploading || !uploadFile}
+            onClick={async () => {
+              try {
+                setUploading(true);
+                const formData = new FormData();
+                formData.append("file", uploadFile!);
+                const res = await fetch(`/api/leads/${lead.id}/upload`, {
+                  method: "POST",
+                  body: formData,
+                });
+                const data = await res.json();
+                if (data.success) {
+                  await onEditDetails({ contractUrl: data.contractUrl });
+                  setSaved(true);
+                  setTimeout(() => setSaved(false), 2000);
+                }
+              } catch (e) {
+                // handle error
+              } finally {
+                setUploading(false);
+              }
+            }}
+            className={`w-full text-sm py-3 mt-4 transition-colors ${saved ? 'bg-emerald-500 text-white rounded-xl shadow-lg font-semibold' : 'btn-primary'}`}
+          >
+            {uploading ? "جاري الرفع..." : saved ? "تم رفع العقد بنجاح ✓" : "رفع الملف"}
           </button>
         </div>
       )}
@@ -1356,6 +1424,17 @@ function LeadActions({
             />
           </div>
 
+          <div className="space-y-1 pt-2">
+            <p className="text-xs text-amber-400 font-semibold">📝 ملاحظات ما حصل بعد الميتنج (تُحفظ في ملف العميل)</p>
+            <textarea
+              rows={3}
+              placeholder="نتيجة المقابلة، ردود فعل العميل، أي معلومة مهمة للـ Sales..."
+              className="input-field text-sm resize-none py-3 w-full border-amber-500/30 focus:border-amber-500/60"
+              value={meetingResultNotes}
+              onChange={(e) => setMeetingResultNotes(e.target.value)}
+            />
+          </div>
+
           {transferError && (
             <div className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl mt-4">
               {transferError}
@@ -1377,6 +1456,9 @@ function LeadActions({
                     notes: meetingNotes,
                   });
                 }
+                if (meetingResultNotes.trim()) {
+                  await onEditDetails({ interestReason: meetingResultNotes.trim() });
+                }
                 if (selectedSales) {
                   await onTransfer(selectedSales);
                 }
@@ -1388,6 +1470,7 @@ function LeadActions({
 
                 setMeetingDate("");
                 setMeetingNotes("");
+                setMeetingResultNotes("");
                 setSelectedSales("");
               } catch(e) {}
             }}

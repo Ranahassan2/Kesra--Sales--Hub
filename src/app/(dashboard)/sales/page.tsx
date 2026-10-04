@@ -9,7 +9,7 @@ export default async function SalesDashboard() {
   const session = await getServerSession(authOptions);
   const userId = session!.user.id;
 
-  const [myLeads, meetingsToday, closedWon, closedLost] = await Promise.all([
+  const [myLeads, meetingsToday, closedWon, enteredMeetings, followUpsScheduled, uploadedContracts] = await Promise.all([
     prisma.lead.findMany({
       where: { assignedToId: userId },
       include: {
@@ -31,16 +31,20 @@ export default async function SalesDashboard() {
       },
     }),
     prisma.lead.count({ where: { assignedToId: userId, status: "CLOSED_WON" } }),
-    prisma.lead.count({ where: { assignedToId: userId, status: "CLOSED_LOST" } }),
+    prisma.activity.count({ where: { userId: userId, type: "MEETING" } }),
+    prisma.followUp.count({ where: { createdById: userId } }),
+    prisma.activity.count({ where: { userId: userId, type: "UPLOAD_CONTRACT" } }),
   ]);
 
   return (
     <DashboardShell title="لوحة المبيعات (Sales)">
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         <StatCard label="إجمالي عملائي" value={myLeads.length} icon="🤝" />
-        <StatCard label="مقابلات اليوم" value={meetingsToday} icon="📅" accent="text-accent-soft" />
-        <StatCard label="صفقات ناجحة" value={closedWon} icon="🤑" accent="text-status-won" />
-        <StatCard label="صفقات مرفوضة" value={closedLost} icon="💔" accent="text-status-lost" />
+        <StatCard label="مواعيد الميتنج اليوم" value={meetingsToday} icon="📅" accent="text-accent-soft" />
+        <StatCard label="العقود" value={closedWon} icon="🤑" accent="text-status-won" />
+        <StatCard label="تم دخول ميتنج" value={enteredMeetings} icon="📹" accent="text-blue-400" />
+        <StatCard label="تم تحديد متابعة" value={followUpsScheduled} icon="📆" accent="text-amber-400" />
+        <StatCard label="عقود مرفوعة" value={uploadedContracts} icon="📄" accent="text-indigo-400" />
       </div>
 
       <div className="glass-panel p-5">

@@ -103,11 +103,17 @@ export default async function AdminDashboard() {
       const wonCount = await prisma.lead.count({
         where: { assignedToId: emp.id, status: "CLOSED_WON" }
       });
-      const lostCount = await prisma.lead.count({
-        where: { assignedToId: emp.id, status: "CLOSED_LOST" }
+      const enteredMeetingsCount = await prisma.activity.count({
+        where: { userId: emp.id, type: "MEETING" }
+      });
+      const followUpsCount = await prisma.followUp.count({
+        where: { createdById: emp.id }
+      });
+      const uploadedContractsCount = await prisma.activity.count({
+        where: { userId: emp.id, type: "UPLOAD_CONTRACT" }
       });
 
-      return { ...emp, actionCount, transferredCount, wonCount, lostCount };
+      return { ...emp, actionCount, transferredCount, wonCount, enteredMeetingsCount, followUpsCount, uploadedContractsCount };
     })
   );
 
@@ -145,7 +151,7 @@ export default async function AdminDashboard() {
         <StatCard label="Hot / Cold" value={hotGold} icon="🔥" accent="text-status-hot" />
         <StatCard label="Meetings اليوم" value={meetingsToday} icon="📅" />
         <StatCard label="تم التحويل" value={transferred} icon="🤝" />
-        <StatCard label="صفقات ناجحة" value={closedWon} icon="✅" accent="text-status-won" />
+        <StatCard label="العقود" value={closedWon} icon="✅" accent="text-status-won" />
         <StatCard label="نسبة التحويل" value={`${conversionRate}%`} icon="📈" accent="text-accent-soft" />
       </div>
 
@@ -203,16 +209,29 @@ export default async function AdminDashboard() {
                   ) : (
                     <>
                       <div className="text-right">
-                        <p className="text-[10px] text-emerald-500/80 font-medium">صفقات ناجحة</p>
+                        <p className="text-[10px] text-emerald-500/80 font-medium">العقود</p>
                         <p className="text-lg font-bold text-emerald-400 mt-0.5">{emp.wonCount}</p>
                       </div>
                       <div className="text-left">
-                        <p className="text-[10px] text-rose-500/80 font-medium">صفقات خاسرة</p>
-                        <p className="text-lg font-bold text-rose-400 mt-0.5">{emp.lostCount}</p>
+                        <p className="text-[10px] text-blue-500/80 font-medium">تم دخول ميتنج</p>
+                        <p className="text-lg font-bold text-blue-400 mt-0.5">{emp.enteredMeetingsCount}</p>
                       </div>
                     </>
                   )}
                 </div>
+
+                {emp.role === "SALES" && (
+                  <div className="flex items-center justify-between border-t border-white/[0.02] pt-2">
+                    <div className="text-right">
+                      <p className="text-[10px] text-amber-500/80 font-medium">تم تحديد متابعة</p>
+                      <p className="text-lg font-bold text-amber-400 mt-0.5">{emp.followUpsCount}</p>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[10px] text-indigo-500/80 font-medium">عقود مرفوعة</p>
+                      <p className="text-lg font-bold text-indigo-400 mt-0.5">{emp.uploadedContractsCount}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
