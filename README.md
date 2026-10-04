@@ -1,145 +1,87 @@
-# TeleSales CRM — نظام إدارة فريق Tele-Sales و Sales
+# TeleSales CRM — Complete Sales & Tele-Sales Management System
 
-نظام CRM إنتاجي كامل لإدارة رحلة الـ Lead من لحظة دخوله للنظام وحتى تحويله لـ Sales
-وإغلاق الصفقة، بأربعة أدوار (Admin, Head of Sales, Tele-Sales, Sales)، مبني على:
+A comprehensive, production-ready CRM system designed to manage the entire Lead journey, from initial entry to Tele-Sales qualification, Sales transfer, and final deal closure. Built with a scalable 4-role architecture (Admin, Head of Sales, Tele-Sales, Sales).
 
-- **Next.js 14** (App Router) + **TypeScript**
-- **PostgreSQL** + **Prisma ORM**
-- **NextAuth** (مصادقة بجلسات JWT، حماية على مستوى الـ Middleware)
-- **Tailwind CSS** — تصميم Dark Glassmorphic، عربي RTL بالكامل (خط Cairo/Tajawal)
+## Tech Stack
+- **Framework:** Next.js 14 (App Router) + TypeScript
+- **Database:** PostgreSQL + Prisma ORM
+- **Authentication:** NextAuth (JWT sessions with strict Middleware protection)
+- **Styling:** Tailwind CSS — Dark Glassmorphic UI design, fully RTL-supported (Arabic)
+- **AI Integration:** Automated AI Meeting Recording & Analysis
 
 ---
 
-## 1. التشغيل محليًا
+## 1. Core Features & Recent Updates
 
-### المتطلبات
+- ✅ **AI Meeting Agent Integration:** Automatically joins scheduled meetings to record, transcribe, and analyze the conversation, posting the summary directly into the client's profile in the CRM.
+- ✅ **WhatsApp Web Integration:** Built-in WhatsApp web interface for instant client communication without leaving the CRM.
+- ✅ **Advanced Contracts Management:** Ability to upload, track, and manage multiple contracts per client, complete with value calculation and statistics.
+- ✅ **Dynamic Dashboards:** Dedicated, isolated dashboards for each role (Admin, Head of Sales, Tele-Sales, Sales) with relevant metrics and charts.
+- ✅ **Fair Lead Distribution:** Automated, round-robin lead assignment for active Tele-Sales agents when uploading CSV lists.
+- ✅ **Comprehensive Activity Logs:** Every status change, follow-up, meeting, or lead transfer is recorded in an immutable Activity Log.
+- ✅ **User Management:** Full UI for the Admin to add, edit, disable, or change passwords for team members.
+- ✅ **Real-time Search & Filtering:** Instant search by Name, Phone, Company, or Email across all tables.
+- ✅ **Duplicate Prevention:** Strict database-level and UI-level prevention of duplicate phone numbers.
+
+---
+
+## 2. Local Setup & Installation
+
+### Prerequisites
 - Node.js 18.17+
-- قاعدة بيانات PostgreSQL (محلية أو عبر Supabase / Neon / RDS)
+- PostgreSQL database (Local or Cloud like Neon/Supabase)
 
-### الخطوات
+### Steps
 
 ```bash
-# 1. تثبيت الباكدجات
+# 1. Install dependencies
 npm install
 
-# 2. إعداد متغيرات البيئة
+# 2. Setup environment variables
 cp .env.example .env
-# افتح .env وحط DATABASE_URL بتاعتك، وولّد NEXTAUTH_SECRET بالأمر:
+# Edit .env and add your DATABASE_URL, and generate a NEXTAUTH_SECRET:
 openssl rand -base64 32
 
-# 3. إنشاء الجداول في قاعدة البيانات
+# 3. Push schema to database
 npm run db:push
 
-# 4. تعبئة بيانات تجريبية (مستخدمين لكل الأدوار + 20 ليد تجريبي)
+# 4. Seed initial mock data (Users + 20 demo leads)
 npm run db:seed
 
-# 5. تشغيل السيرفر
+# 5. Start the development server
 npm run dev
 ```
 
-هيشتغل النظام على `http://localhost:3000`
+The system will run on `http://localhost:3000`.
 
-### حسابات تجريبية (بعد الـ seed)
+### Demo Accounts (After Seeding)
 
-| الدور | Username | Password |
+| Role | Username | Password |
 |---|---|---|
 | Admin | `admin` | `Passw0rd!` |
 | Head of Sales | `head.sales` | `Passw0rd!` |
-| Tele-Sales | `tele1` … `tele5` | `Passw0rd!` |
+| Tele-Sales | `tele1` to `tele5` | `Passw0rd!` |
 | Sales | `sales1`, `sales2` | `Passw0rd!` |
 
-**⚠️ غيّروا كلمات المرور دي فورًا قبل أي استخدام حقيقي — دي بيانات تجريبية بس.**
+**⚠️ IMPORTANT: Please change these passwords immediately before any production use.**
 
 ---
 
-## 2. هيكل النظام
+## 3. Architecture & Security
 
-```
-src/
-  app/
-    login/                       صفحة الدخول
-    (dashboard)/
-      admin/                     داشبورد Admin + Head of Sales (رؤية كاملة)
-      tele-sales/                داشبورد موظف Tele-Sales
-      sales/                     داشبورد موظف Sales
-    api/
-      auth/[...nextauth]/        المصادقة
-      leads/                     GET (List) / POST (إضافة يدوي)
-      leads/upload/              رفع CSV وتوزيع تلقائي
-      leads/[id]/status/         تحديث الحالة والتصنيف
-      leads/[id]/followup/       تسجيل متابعة
-      leads/[id]/meeting/        تحديد/تحديث نتيجة Meeting
-      leads/[id]/transfer/       تحويل من Tele-Sales إلى Sales
-  lib/
-    auth.ts                      إعدادات NextAuth
-    permissions.ts                خريطة الصلاحيات (RBAC) — نقطة تحكم واحدة
-    lead-distribution.ts          منطق التوزيع العادل (Round-robin)
-  middleware.ts                   حماية المسارات حسب الدور
-prisma/
-  schema.prisma                   نموذج البيانات الكامل
-  seed.ts                         بيانات تجريبية
-```
+- **Centralized Permissions (`src/lib/permissions.ts`):** Role-Based Access Control (RBAC) is centralized for easy auditing and updates.
+- **Middleware Protection:** Route-level protection ensures users can only access their designated dashboards. Unauthorized access attempts are automatically redirected.
+- **Single Ownership Model:** A single `assignedToId` tracks the lead's current owner, seamlessly transferring ownership from Tele-Sales to Sales to prevent data conflicts.
+- **Active-Only Distribution:** The system only assigns new leads to currently active agents, ensuring no leads are lost to disabled or offline accounts.
 
 ---
 
-## 3. أهم قرارات التصميم المعماري
+## 4. Production Deployment
 
-- **الصلاحيات في مكان واحد** (`src/lib/permissions.ts`) — أي تعديل مستقبلي على مين
-  يقدر يعمل إيه بيبدأ من هنا، مش متبعثر في كل API route.
-- **كل حاجة بتتسجل في Activity Log** — كل تغيير حالة، متابعة، Meeting، أو تحويل
-  بيتسجل في جدول `Activity` مربوط بالـ Lead، فالإدارة تقدر تشوف تاريخ العميل بالكامل.
-- **التوزيع العادل** بيحسب على موظفي Tele-Sales النشطين فقط (`isActive: true`)،
-  فلو موظف اتعطل حسابه، مش هياخد ليدز جديدة تلقائيًا.
-- **ownership واحد للـ Lead** (`assignedToId`) بينتقل من Tele-Sales لـ Sales عند
-  التحويل، بدل ما يكون فيه جدولين منفصلين — بيسهّل الاستعلامات ويمنع تضارب البيانات.
-- **الحماية على مستوى الـ Middleware** — حتى لو حد جرب يدخل على `/admin` مباشرة
-  من الرابط وهو Tele-Sales، هيتحول لصفحة "غير مصرح" تلقائيًا.
+This project is optimized for deployment on Vercel.
 
----
-
-## 4. النشر (Production)
-
-### الخيارات المقترحة
-- **الفرونت + الباك**: Vercel (الأسهل مع Next.js) أو أي VPS بتشغّل Node.js
-- **قاعدة البيانات**: Supabase أو Neon (Postgres مُدار، فيه Free tier كويس للبداية)
-
-### خطوات النشر على Vercel
-1. ارفع الكود على GitHub
-2. Import المشروع في Vercel
-3. ضيف Environment Variables (`DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`)
-4. Vercel هيبني وينشر تلقائيًا
-
----
-
-## 5. تحديثات جديدة تمت إضافتها
-
-بعد المراجعة الشاملة، اتضاف للنظام:
-
-- ✅ **صفحة إدارة المستخدمين** (`/admin/users`) — الأدمن يقدر يضيف موظفين جدد،
-  يغيّر أدوارهم، يعطّل/يفعّل حساباتهم، ويعيد تعيين كلمة المرور، كله من الواجهة
-  بدل التعديل المباشر في قاعدة البيانات.
-- ✅ **صفحة سجل النشاط الكامل** (`/admin/activity`) — كل تغيير حالة، متابعة،
-  Meeting، أو تحويل، بفلترة حسب نوع النشاط.
-- ✅ **صفحة تقارير وتحليلات** (`/admin/reports`) — توزيع الليدز حسب الحالة
-  والتصنيف، أداء الفريق، نسبة التحويل لصفقة، ومنحنى الليدز الجديدة آخر 14 يوم
-  (بمكتبة `recharts` اللي كانت موجودة كـ dependency بس مش مستخدمة).
-- ✅ **تسجيل نتيجة الـ Meeting من الواجهة** — كان الـ API جاهز بس مفيش زرار
-  يستخدمه.
-- ✅ **إغلاق المتابعات (Follow-ups)** — تظهر المتابعات المعلّقة على كل عميل مع
-  زرار "تم ✓".
-- ✅ **تعديل بيانات العميل وحذفه** (الحذف للأدمن فقط) من نفس صف الليد.
-- ✅ **منع تكرار نفس رقم الهاتف** كليد جديد سواء بالرفع أو بالإضافة اليدوية.
-- ✅ **بحث فوري** داخل كل جدول ليدز (بالاسم/الهاتف/الشركة/الإيميل).
-- ✅ **تغيير كلمة المرور الشخصية** (`/account`).
-- ✅ **Navigation** في الهيدر يتغيّر حسب دور المستخدم.
-
-### الخطوات القادمة المقترحة (Roadmap)
-
-- [ ] **صفحة Meetings مخصصة** بفلاتر (اليوم / غدًا / القادمة / التي تمت / المؤجلة / الملغاة)
-- [ ] **رفع ملفات Excel (.xlsx) مباشرة** — حاليًا بيدعم CSV بس، وإضافة xlsx بسيطة
-      بمكتبة `xlsx` أو `exceljs`
-- [ ] **إشعارات** (Follow-up مستحق، Meeting بعد ساعة) — عبر Email أو داخل النظام
-- [ ] **Pagination حقيقي من السيرفر** للوحة الأدمن بدل حد أقصى 200 ليد
-- [ ] **Rate limiting / Audit trail أعمق** لو النظام هيتفتح لعدد كبير من المستخدمين
-
-قوليلي لو عاوز أكمل أي حاجة من دول أو لو فيه تعديل على منطق التوزيع أو الصلاحيات.
+1. Push your code to GitHub.
+2. Import the project in Vercel as a Next.js application.
+3. Ensure the `backend` folder is excluded from the Next.js build (already configured in `tsconfig.json`).
+4. Add the required Environment Variables (`DATABASE_URL`, `NEXTAUTH_SECRET`, etc.).
+5. Click **Deploy**.
