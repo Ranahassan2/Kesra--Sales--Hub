@@ -22,6 +22,9 @@ export interface MeetingRow {
   status: string;
   result: string | null;
   notes: string | null;
+  recordingUrl?: string | null;
+  transcript?: string | null;
+  aiAnalysis?: string | null;
 }
 
 export interface ActivityRow {
@@ -614,9 +617,41 @@ export default function LeadTable({
                   {/* Show Meeting Date and Notes for Sales or Admin */}
                   {(isSalesView || lead.currentStage === "SALES") && lead.meetings?.[0] && (
                     lead.meetings[0].status === "DONE" ? (
-                      <div className="mt-4 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
-                        <p className="text-xs text-emerald-400 font-bold mb-2">✅ نتيجة المقابلة: {formatDateTime(lead.meetings[0].scheduledAt)}</p>
-                        {lead.meetings[0].result && <p className="text-[11px] text-slate-300 leading-relaxed bg-[#0b101a] p-2.5 rounded-lg border border-white/5">{lead.meetings[0].result}</p>}
+                      <div className="mt-4 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl space-y-3">
+                        <div>
+                          <p className="text-xs text-emerald-400 font-bold mb-2">✅ نتيجة المقابلة: {formatDateTime(lead.meetings[0].scheduledAt)}</p>
+                          {lead.meetings[0].result && <p className="text-[11px] text-slate-300 leading-relaxed bg-[#0b101a] p-2.5 rounded-lg border border-white/5">{lead.meetings[0].result}</p>}
+                        </div>
+
+                        {(lead.meetings[0].recordingUrl || lead.meetings[0].aiAnalysis || lead.meetings[0].transcript) && (
+                          <div className="border-t border-emerald-500/20 pt-3 space-y-3">
+                            <h4 className="text-xs font-bold text-emerald-300 flex items-center gap-1"><span>🤖</span> تسجيل وتحليل الذكاء الاصطناعي</h4>
+                            
+                            {lead.meetings[0].recordingUrl && (
+                              <a href={lead.meetings[0].recordingUrl} target="_blank" className="flex items-center justify-center gap-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 py-2 rounded-lg text-[11px] font-bold transition-colors">
+                                <span>▶️</span> مشاهدة تسجيل الميتنج
+                              </a>
+                            )}
+                            
+                            {lead.meetings[0].aiAnalysis && (
+                              <div>
+                                <p className="text-[10px] text-slate-400 mb-1">الملخص والتحليل:</p>
+                                <div className="text-[11px] text-slate-300 leading-relaxed bg-[#0b101a] p-2.5 rounded-lg border border-white/5 whitespace-pre-wrap max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+                                  {lead.meetings[0].aiAnalysis}
+                                </div>
+                              </div>
+                            )}
+
+                            {lead.meetings[0].transcript && (
+                              <div>
+                                <p className="text-[10px] text-slate-400 mb-1">السكريبت بالكامل:</p>
+                                <div className="text-[11px] text-slate-300 leading-relaxed bg-[#0b101a] p-2.5 rounded-lg border border-white/5 whitespace-pre-wrap max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+                                  {lead.meetings[0].transcript}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="mt-4 bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl">
