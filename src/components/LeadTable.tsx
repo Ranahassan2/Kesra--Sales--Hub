@@ -691,34 +691,42 @@ export default function LeadTable({
                   >
                     التفاصيل
                   </button>
-                  <a 
-                    href="https://meet.google.com/new"
-                    target="_blank" rel="noopener noreferrer"
-                    onClick={() => {
-                      call(`/api/leads/${lead.id}/activity`, "POST", {
-                        type: "MEETING",
-                        message: "بدأ الموظف ميتنج جوجل فوري (Google Meet) مع العميل"
-                      }).catch(() => {});
+                  <button 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const url = window.prompt("من فضلك أدخل رابط جوجل ميت (Google Meet) لدعوة البوت:");
+                      if (url) {
+                        call(`/api/leads/${lead.id}/invite-ai`, "POST", { meetingUrl: url }).then(() => {
+                          setTimeout(() => window.location.reload(), 1000);
+                        }).catch(() => {});
+                        window.open(url, "_blank");
+                      } else {
+                        window.open("https://meet.google.com/new", "_blank");
+                      }
                     }}
                     className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl w-10 flex items-center justify-center transition-colors"
                     title="ميتنج جوجل"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-                  </a>
-                  <a 
-                    href="https://zoom.us/meeting/schedule"
-                    target="_blank" rel="noopener noreferrer"
-                    onClick={() => {
-                      call(`/api/leads/${lead.id}/activity`, "POST", {
-                        type: "MEETING",
-                        message: "قام الموظف بإنشاء غرفة ميتنج زوم (Zoom) للعميل"
-                      }).catch(() => {});
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const url = window.prompt("من فضلك أدخل رابط زوم (Zoom) لدعوة البوت:");
+                      if (url) {
+                        call(`/api/leads/${lead.id}/invite-ai`, "POST", { meetingUrl: url }).then(() => {
+                          setTimeout(() => window.location.reload(), 1000);
+                        }).catch(() => {});
+                        window.open(url, "_blank");
+                      } else {
+                        window.open("https://zoom.us/meeting/schedule", "_blank");
+                      }
                     }}
                     className="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-xl w-10 flex items-center justify-center transition-colors"
                     title="ميتنج زوم"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 10.655V8.5A1.5 1.5 0 0 0 14.5 7h-11A1.5 1.5 0 0 0 2 8.5v8A1.5 1.5 0 0 0 3.5 18h11a1.5 1.5 0 0 0 1.5-1.5v-2.155l4.636 3.161A.5.5 0 0 0 22 17.094V7.906a.5.5 0 0 0-.78-.415L16 10.655z"/></svg>
-                  </a>
+                  </button>
                   <button
                     onClick={(e) => {
                       e.preventDefault();
