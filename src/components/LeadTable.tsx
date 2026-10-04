@@ -724,9 +724,10 @@ export default function LeadTable({
                       e.preventDefault();
                       const jitsiUrl = `https://meet.jit.si/Telesales_${lead.phone}_${Math.floor(Date.now() / 1000)}`;
                       localStorage.setItem(`jitsi_${lead.id}`, jitsiUrl);
-                      call(`/api/leads/${lead.id}/activity`, "POST", {
-                        type: "MEETING",
-                        message: `قام الموظف بإنشاء غرفة Jitsi للعميل: ${jitsiUrl}`
+                      call(`/api/leads/${lead.id}/invite-ai`, "POST", {
+                        meetingUrl: jitsiUrl
+                      }).then(() => {
+                        setTimeout(() => window.location.reload(), 1000); // Reload to show AI data
                       }).catch(() => {});
                       window.open(jitsiUrl, "_blank");
                     }}
