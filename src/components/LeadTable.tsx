@@ -614,8 +614,8 @@ export default function LeadTable({
                       {latestActivity ? `آخر تواصل: ${formatDateTime(latestActivity.createdAt)}` : "لم يتم التواصل بعد"}
                     </span>
                   </div>
-                  {/* Show Meeting Date and Notes for Sales or Admin */}
-                  {(isSalesView || lead.currentStage === "SALES") && lead.meetings?.[0] && (
+                  {/* Show Meeting Date and Notes if any meeting exists */}
+                  {lead.meetings?.[0] && (
                     lead.meetings[0].status === "DONE" ? (
                       <div className="mt-4 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl space-y-3">
                         <div>
