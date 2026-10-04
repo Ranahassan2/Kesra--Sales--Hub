@@ -129,6 +129,13 @@ export default function LeadTable({
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // AI Invite Modal
+  const [aiInviteModalOpen, setAiInviteModalOpen] = useState(false);
+  const [aiInviteLeadId, setAiInviteLeadId] = useState<string | null>(null);
+  const [aiInviteProvider, setAiInviteProvider] = useState<string>("");
+  const [aiInviteUrl, setAiInviteUrl] = useState("");
+  const [aiInviteLoading, setAiInviteLoading] = useState(false);
+
   // WhatsApp modal
   const [waModalOpen, setWaModalOpen] = useState(false);
   const [waTargetPhone, setWaTargetPhone] = useState("");
@@ -694,15 +701,11 @@ export default function LeadTable({
                   <button 
                     onClick={(e) => {
                       e.preventDefault();
-                      const url = window.prompt("من فضلك أدخل رابط جوجل ميت (Google Meet) لدعوة البوت:");
-                      if (url) {
-                        call(`/api/leads/${lead.id}/invite-ai`, "POST", { meetingUrl: url }).then(() => {
-                          setTimeout(() => window.location.reload(), 1000);
-                        }).catch(() => {});
-                        window.open(url, "_blank");
-                      } else {
-                        window.open("https://meet.google.com/new", "_blank");
-                      }
+                      setAiInviteProvider("جوجل ميت (Google Meet)");
+                      setAiInviteLeadId(lead.id);
+                      setAiInviteUrl("");
+                      setAiInviteModalOpen(true);
+                      window.open("https://meet.google.com/new", "_blank");
                     }}
                     className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl w-10 flex items-center justify-center transition-colors"
                     title="ميتنج جوجل"
@@ -712,15 +715,11 @@ export default function LeadTable({
                   <button 
                     onClick={(e) => {
                       e.preventDefault();
-                      const url = window.prompt("من فضلك أدخل رابط زوم (Zoom) لدعوة البوت:");
-                      if (url) {
-                        call(`/api/leads/${lead.id}/invite-ai`, "POST", { meetingUrl: url }).then(() => {
-                          setTimeout(() => window.location.reload(), 1000);
-                        }).catch(() => {});
-                        window.open(url, "_blank");
-                      } else {
-                        window.open("https://zoom.us/meeting/schedule", "_blank");
-                      }
+                      setAiInviteProvider("زوم (Zoom)");
+                      setAiInviteLeadId(lead.id);
+                      setAiInviteUrl("");
+                      setAiInviteModalOpen(true);
+                      window.open("https://zoom.us/meeting/schedule", "_blank");
                     }}
                     className="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-xl w-10 flex items-center justify-center transition-colors"
                     title="ميتنج زوم"
@@ -824,6 +823,55 @@ export default function LeadTable({
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Invite Modal */}
+      {aiInviteModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-md p-4">
+          <div className="bg-[#0f1523] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-5 border-b border-white/10 flex justify-between items-center bg-indigo-900/20">
+              <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                <span className="text-indigo-400">🤖</span> دعوة البوت لـ {aiInviteProvider}
+              </h3>
+              <button onClick={() => setAiInviteModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">✕</button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-300 text-sm mb-4 leading-relaxed">
+                تم فتح صفحة {aiInviteProvider} في نافذة جديدة. 
+                بعد إنشاء الاجتماع هناك، يرجى نسخ الرابط ولصقه هنا لدعوة البوت لتسجيل المكالمة:
+              </p>
+              <input
+                type="text"
+                dir="ltr"
+                className="w-full bg-[#0e1320] border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500 mb-4"
+                placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                value={aiInviteUrl}
+                onChange={(e) => setAiInviteUrl(e.target.value)}
+              />
+              <button
+                onClick={async () => {
+                  if (!aiInviteUrl.trim() || !aiInviteLeadId) return;
+                  setAiInviteLoading(true);
+                  try {
+                    await fetch(`/api/leads/${aiInviteLeadId}/invite-ai`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ meetingUrl: aiInviteUrl })
+                    });
+                    setAiInviteModalOpen(false);
+                    setTimeout(() => window.location.reload(), 1000);
+                  } catch (e) {
+                    setAiInviteLoading(false);
+                  }
+                }}
+                disabled={aiInviteLoading || !aiInviteUrl.trim()}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl disabled:opacity-50 transition-colors"
+              >
+                {aiInviteLoading ? "جاري دعوة البوت..." : "دعوة البوت الآن 🚀"}
+              </button>
             </div>
           </div>
         </div>
