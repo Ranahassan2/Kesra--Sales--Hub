@@ -14,18 +14,18 @@
 
 ---
 
-### 🧠 Overview
+### Overview
 
 **Kesra Sales Hub** is a next-generation Customer Relationship Management (CRM) platform engineered specifically for modern sales teams. Moving beyond static databases, it integrates predictive machine learning models to dynamically score leads and forecast sales pipelines, empowering sales representatives to focus their efforts on high-conversion prospects.
 
-### ⚙️ Core Architecture
+### Core Architecture
 
 - **Predictive Lead Scoring:** Embeds `Scikit-Learn` machine learning models to analyze historical conversion data and assign dynamic probability scores to incoming leads.
 - **Robust Backend:** Powered by `Node.js` and `TypeScript`, ensuring type-safe, scalable, and high-performance API endpoints for rapid data retrieval.
 - **Relational Data Management:** Utilizes `PostgreSQL` for ACID-compliant, complex relational data structures required for enterprise sales tracking.
 - **Interactive Dashboard:** A highly responsive `React` frontend that visualizes pipeline health, lead trajectories, and real-time ML forecasts.
 
-### 🚀 Key Features
+### Key Features
 
 1. **AI-Driven Prioritization:** Automatically sorts and highlights leads based on ML conversion probability rather than chronological order.
 2. **Automated Pipeline Forecasting:** Generates accurate revenue forecasts by combining historical velocity metrics with current lead scores.
