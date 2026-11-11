@@ -2,18 +2,17 @@ import { Role } from "@/lib/enums";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { can } from "@/lib/permissions";
+import { can, teamRoleForManager } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import Papa from "papaparse";
 import { z } from "zod";
-import bcrypt from "bcryptjs";
+import { generateInviteToken, getInviteExpiry, buildInviteLink } from "@/lib/invite-token";
 
 const rowSchema = z.object({
   name: z.string().min(1),
   username: z.string().min(1),
   email: z.string().email(),
   phone: z.string().optional().or(z.literal("")),
-  password: z.string().min(6),
   role: z.nativeEnum(Role).optional().default(Role.TELE_SALES),
 });
 
@@ -28,8 +27,6 @@ function normalizeHeader(h: string) {
     "الايميل": "email",
     "رقم الهاتف": "phone",
     "الهاتف": "phone",
-    "كلمة المرور": "password",
-    "الباسورد": "password",
     "الدور": "role",
     "الرتبة": "role",
   };
@@ -39,14 +36,19 @@ function normalizeHeader(h: string) {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !can(session.user.role, "MANAGE_USERS")) {
-    return NextResponse.json({ error: "غير مصرح لك بهذا الإجراء" }, { status: 403 });
+  if (!session || !can(session.user.role, "MANAGE_TEAM_USERS")) {
+    return NextResponse.json({ error: "You are not authorized to perform this action" }, { status: 403 });
   }
+
+  // A Head can only add employees to their own team — whatever the sheet's
+  // Role column says, every row is forced into their team's role. The
+  // Admin keeps full control over the Role column.
+  const managedRole = teamRoleForManager(session.user.role);
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   if (!file) {
-    return NextResponse.json({ error: "لم يتم إرفاق ملف" }, { status: 400 });
+    return NextResponse.json({ error: "No file was attached" }, { status: 400 });
   }
 
   const text = await file.text();
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   if (parsed.errors.length > 0) {
     return NextResponse.json(
-      { error: "تعذّرت قراءة الملف", details: parsed.errors },
+      { error: "Failed to read the file", details: parsed.errors },
       { status: 400 }
     );
   }
@@ -67,30 +69,43 @@ export async function POST(req: NextRequest) {
   const invalidRows: { row: number; error: string }[] = [];
 
   (parsed.data as any[]).forEach((row, i) => {
-    let mappedRole = row.role;
-    if (mappedRole === "ادمن" || mappedRole === "أدمن" || mappedRole === "مدير النظام") mappedRole = "ADMIN";
-    if (mappedRole === "موظف" || mappedRole === "مبيعات" || mappedRole === "تيلي سيلز") mappedRole = "TELE_SALES";
-    if (mappedRole === "كاستمر سيرفيس" || mappedRole === "خدمة عملاء") mappedRole = "CUSTOMER_SERVICE";
-    
-    if(mappedRole) row.role = mappedRole;
+    let mappedRole = typeof row.role === "string" ? row.role.trim() : row.role;
+    const normalizedRole = typeof mappedRole === "string" ? mappedRole.toLowerCase() : mappedRole;
+    if (["ادمن", "أدمن", "مدير النظام", "مدير", "admin"].includes(normalizedRole)) {
+      mappedRole = "ADMIN";
+    } else if (["رئيس المبيعات", "رئيس مبيعات", "هيد سيلز", "head of sales", "head_of_sales"].includes(normalizedRole)) {
+      mappedRole = "HEAD_OF_SALES";
+    } else if (["رئيس التيلي سيلز", "رئيس تيلي سيلز", "هيد تيلي سيلز", "head of tele-sales", "head of tele sales", "head_of_tele_sales"].includes(normalizedRole)) {
+      mappedRole = "HEAD_OF_TELE_SALES";
+    } else if (["تيلي سيلز", "موظف تيلي سيلز", "تيلي", "tele-sales", "tele sales", "tele_sales"].includes(normalizedRole)) {
+      mappedRole = "TELE_SALES";
+    } else if (["مبيعات", "سيلز", "موظف مبيعات", "موظف سيلز", "sales"].includes(normalizedRole)) {
+      mappedRole = "SALES";
+    }
+
+    if (mappedRole) row.role = mappedRole;
+
+    // A Head's upload always lands in their own team, regardless of
+    // whatever role was written in the sheet.
+    if (managedRole) row.role = managedRole;
 
     const result = rowSchema.safeParse(row);
     if (result.success) {
       validRows.push(result.data);
     } else {
-      invalidRows.push({ row: i + 2, error: result.error.issues[0]?.message ?? "بيانات غير صحيحة" });
+      invalidRows.push({ row: i + 2, error: result.error.issues[0]?.message ?? "Invalid data" });
     }
   });
 
   if (validRows.length === 0) {
     return NextResponse.json(
-      { error: "لا يوجد صفوف صالحة في الملف", invalidRows },
+      { error: "No valid rows found in the file", invalidRows },
       { status: 400 }
     );
   }
 
   const duplicateUsers = [];
-  const insertedUsers = [];
+  const insertedUsers: { name: string; username: string; inviteLink: string }[] = [];
 
   for (const row of validRows) {
     const existing = await prisma.user.findFirst({
@@ -107,18 +122,23 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    const hashedPassword = await bcrypt.hash(row.password, 10);
+    const inviteToken = generateInviteToken();
     const user = await prisma.user.create({
       data: {
         name: row.name,
         username: row.username,
         email: row.email,
         phone: row.phone || null,
-        passwordHash: hashedPassword,
         role: row.role as Role,
+        inviteToken,
+        inviteTokenExpiresAt: getInviteExpiry(),
       }
     });
-    insertedUsers.push(user);
+    insertedUsers.push({
+      name: user.name,
+      username: user.username,
+      inviteLink: buildInviteLink(inviteToken, req.nextUrl.origin),
+    });
   }
 
   return NextResponse.json({
@@ -127,5 +147,6 @@ export async function POST(req: NextRequest) {
     skipped: invalidRows.length + duplicateUsers.length,
     invalidRows,
     duplicateUsers,
+    insertedUsers,
   });
 }

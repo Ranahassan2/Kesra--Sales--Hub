@@ -1,13 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
-const prisma = new PrismaClient();
+// Returns the progress of a large upload being processed in the background — the UI polls
+// this every few seconds until status becomes DONE or FAILED.
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user.role !== "ADMIN" && session.user.role !== "HEAD_OF_SALES" && session.user.role !== "HEAD_OF_TELE_SALES")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const batch = await prisma.uploadBatch.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true,
+      fileName: true,
+      totalLeads: true,
+      processedLeads: true,
+      skippedLeads: true,
+      status: true,
+      errorMessage: true,
+    },
+  });
+
+  if (!batch) {
+    return NextResponse.json({ error: "Batch not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ batch });
+}
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session || (session.user.role !== "ADMIN" && session.user.role !== "HEAD_OF_SALES")) {
+  if (!session || (session.user.role !== "ADMIN" && session.user.role !== "HEAD_OF_SALES" && session.user.role !== "HEAD_OF_TELE_SALES")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 

@@ -1,15 +1,18 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import DashboardShell from "@/components/DashboardShell";
 import SheetsClient from "./SheetsClient";
 
-const prisma = new PrismaClient();
-
 export default async function AdminSheetsPage() {
   const session = await getServerSession(authOptions);
-  if (!session || (session.user.role !== "ADMIN" && session.user.role !== "HEAD_OF_SALES")) {
+  if (
+    !session ||
+    (session.user.role !== "ADMIN" &&
+      session.user.role !== "HEAD_OF_SALES" &&
+      session.user.role !== "HEAD_OF_TELE_SALES")
+  ) {
     redirect("/");
   }
 
@@ -22,7 +25,7 @@ export default async function AdminSheetsPage() {
   });
 
   return (
-    <DashboardShell title="إدارة الشيتات">
+    <DashboardShell title="Sheets Management">
       <SheetsClient initialBatches={batches} />
     </DashboardShell>
   );

@@ -1,18 +1,21 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import AdminCustomersClient from "@/app/(dashboard)/admin/customers/AdminCustomersClient";
-
-const prisma = new PrismaClient();
 
 import DashboardShell from "@/components/DashboardShell";
 
 export default async function AdminCustomersPage() {
   const session = await getServerSession(authOptions);
   
-  // Only Admin and Head of Sales can access this
-  if (!session || (session.user.role !== "ADMIN" && session.user.role !== "HEAD_OF_SALES")) {
+  // Only Admin and the Heads can access this
+  if (
+    !session ||
+    (session.user.role !== "ADMIN" &&
+      session.user.role !== "HEAD_OF_SALES" &&
+      session.user.role !== "HEAD_OF_TELE_SALES")
+  ) {
     redirect("/");
   }
 
@@ -46,7 +49,7 @@ export default async function AdminCustomersPage() {
   });
 
   return (
-    <DashboardShell title="إدارة العملاء">
+    <DashboardShell title="Lead Management">
       <AdminCustomersClient 
         initialLeads={JSON.parse(JSON.stringify(leads))} 
         employees={JSON.parse(JSON.stringify(employees))} 

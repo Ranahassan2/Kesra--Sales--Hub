@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { Users } from "lucide-react";
 
 export type OnlineUser = {
   id: string;
@@ -10,10 +11,11 @@ export type OnlineUser = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  ADMIN: "مدير النظام",
-  HEAD_OF_SALES: "رئيس المبيعات",
-  TELE_SALES: "موظف Tele-Sales",
-  SALES: "موظف Sales",
+  ADMIN: "Admin",
+  HEAD_OF_SALES: "Head of Sales",
+  HEAD_OF_TELE_SALES: "Head of Tele-Sales",
+  TELE_SALES: "Tele-Sales",
+  SALES: "Sales",
 };
 
 export default function OnlineUsers({ currentUserRole }: { currentUserRole?: string }) {
@@ -46,7 +48,7 @@ export default function OnlineUsers({ currentUserRole }: { currentUserRole?: str
         const data = await res.json();
         let fetchedUsers = data.onlineUsers || [];
         
-        // إذا كان الموظف تيلي سيلز، اعرض له موظفين السيلز المتصلين فقط (عشان يعرف يحولهم العملاء)
+        // If the employee is Tele-Sales, only show online Sales employees (so they know who to transfer leads to)
         if (currentUserRole === "TELE_SALES") {
           fetchedUsers = fetchedUsers.filter((u: any) => u.role === "SALES");
         }
@@ -63,11 +65,11 @@ export default function OnlineUsers({ currentUserRole }: { currentUserRole?: str
   return (
     <div className="relative" ref={wrapperRef}>
       <div 
-        className="cursor-pointer hover:bg-white/5 p-2 rounded-full transition-colors relative mr-2"
+        className="cursor-pointer hover:bg-white/5 p-2 rounded-full transition-colors relative"
         onClick={() => setIsOpen(!isOpen)}
-        title="الموظفون المتصلون حالياً"
+        title="Employees currently online"
       >
-        <span className="text-3xl leading-none block select-none">👥</span>
+        <Users size={24} className="text-slate-200" />
         {onlineCount > 0 && (
           <span className="absolute top-1 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-[11px] font-bold text-white border-2 border-[#0f1523]">
             {onlineCount > 99 ? '99+' : onlineCount}
@@ -81,16 +83,16 @@ export default function OnlineUsers({ currentUserRole }: { currentUserRole?: str
       {isOpen && (
         <div className="absolute top-full right-0 mt-2 w-72 bg-[#161f33] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
           <div className="p-3 border-b border-white/10 bg-white/5">
-            <h3 className="text-white font-bold text-sm">متصل الآن ({onlineCount})</h3>
+            <h3 className="text-white font-bold text-sm">Online Now ({onlineCount})</h3>
           </div>
           <div className="max-h-80 overflow-y-auto">
             {users.length === 0 ? (
-              <p className="text-center text-slate-400 text-sm py-6">لا يوجد أحد متصل حالياً</p>
+              <p className="text-center text-slate-400 text-sm py-6">No one is online right now</p>
             ) : (
               users.map((u) => (
                 <div key={u.id} className="p-3 border-b border-white/5 flex items-center gap-3">
                   <div className="relative">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-700/50 text-white font-bold text-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/50 text-white font-bold text-sm">
                       {u.name.charAt(0)}
                     </div>
                     <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-[#161f33]" />

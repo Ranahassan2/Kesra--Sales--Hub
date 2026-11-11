@@ -11,8 +11,8 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "TeleSales CRM",
-  description: "نظام إدارة فريق التيلي سيلز والسيلز",
+  title: "Kesra CRM",
+  description: "Management system for the Tele-Sales and Sales team",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

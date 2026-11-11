@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
@@ -26,30 +27,31 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res?.error) {
-      setError("اسم المستخدم أو كلمة المرور غير صحيحة");
+      setError(
+        res.error === "CredentialsSignin"
+          ? "Incorrect username or password"
+          : res.error
+      );
       return;
     }
 
-    // بعد الدخول، الصفحة الرئيسية بتوجه كل دور لمكانه المناسب
+    // After login, the home page routes each role to its appropriate place
     router.push("/");
     router.refresh();
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center bg-kesra-hero px-4">
       <div className="glass-panel w-full max-w-md p-10 py-12">
         <div className="mb-10 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/20 text-3xl">
-            📞
-          </div>
-          <h1 className="text-2xl font-bold text-white">TeleSales CRM</h1>
-          <p className="mt-1 text-sm text-slate-400">تسجيل الدخول إلى حسابك</p>
+          <h1 className="text-3xl font-bold text-white">Kesra CRM</h1>
+          <p className="mt-1 text-sm text-[#a89bb8]">Sign in to your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-400">
-              اسم المستخدم
+              Username
             </label>
             <input
               className="input-field"
@@ -61,7 +63,7 @@ export default function LoginPage() {
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-400">
-              كلمة المرور
+              Password
             </label>
             <div className="relative">
               <input
@@ -91,6 +93,11 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+            <div className="mt-1.5 text-right">
+              <Link href="/forgot-password" className="text-xs text-slate-400 hover:text-white">
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           {error && (
@@ -100,7 +107,7 @@ export default function LoginPage() {
           )}
 
           <button type="submit" disabled={loading} className="btn-primary w-full">
-            {loading ? "جاري الدخول..." : "دخول"}
+            {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
       </div>

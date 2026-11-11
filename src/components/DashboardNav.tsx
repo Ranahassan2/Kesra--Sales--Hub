@@ -8,26 +8,34 @@ export default function DashboardNav({ role }: { role: string }) {
 
   const links: { href: string; label: string }[] = [];
 
-  if (role === "ADMIN" || role === "HEAD_OF_SALES") {
-    links.push({ href: "/admin", label: "لوحة التحكم" });
-    links.push({ href: "/admin/customers", label: "إدارة العملاء" });
-    links.push({ href: "/admin/sheets", label: "إدارة الشيتات" });
-    links.push({ href: "/admin/activity", label: "متابعة الموظفين" });
-    links.push({ href: "/admin/meetings", label: "تقرير بعد ميتنج" });
+  if (role === "ADMIN" || role === "HEAD_OF_SALES" || role === "HEAD_OF_TELE_SALES") {
+    links.push({ href: "/admin", label: "Dashboard" });
+    links.push({ href: "/admin/customers", label: "Lead Management" });
+    links.push({ href: "/admin/sheets", label: "Sheets Management" });
+    links.push({ href: "/admin/activity", label: "Employee Monitoring" });
   }
-  if (role === "ADMIN") {
-    links.push({ href: "/admin/users", label: "الموظفين" });
+  // Post-Meeting Report is Sales-only content (Tele-Sales never holds
+  // meetings), so Head of Tele-Sales doesn't get this link.
+  if (role === "ADMIN" || role === "HEAD_OF_SALES") {
+    links.push({ href: "/admin/meetings", label: "Post-Meeting Report" });
+  }
+  if (role === "ADMIN" || role === "HEAD_OF_SALES" || role === "HEAD_OF_TELE_SALES") {
+    links.push({ href: "/admin/users", label: "Employees" });
   }
   if (role === "TELE_SALES") {
-    links.push({ href: "/tele-sales", label: "لوحتي" });
+    links.push({ href: "/tele-sales", label: "My Dashboard" });
   }
   if (role === "SALES") {
-    links.push({ href: "/sales", label: "لوحتي" });
+    links.push({ href: "/sales", label: "My Dashboard" });
   }
   if (role === "ADMIN") {
-    links.push({ href: "/account", label: "حسابي" });
+    links.push({ href: "/account", label: "My Account" });
   }
-  links.push({ href: "/whatsapp-inbox", label: "💬 واتساب ويب" });
+  // WhatsApp temporarily disabled: this host can't run the persistent
+  // Chrome/Puppeteer session whatsapp-web.js needs (confirmed with
+  // Hostinger support). Hidden here rather than removed so it's a one-line
+  // revert once a VPS or the official WhatsApp Cloud API is wired in.
+  // links.push({ href: "/whatsapp-inbox", label: "💬 واتساب ويب" });
 
   return (
     <nav className="flex items-center gap-1 overflow-x-auto">

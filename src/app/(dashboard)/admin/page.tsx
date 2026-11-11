@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import DashboardShell from "@/components/DashboardShell";
 import StatCard from "@/components/StatCard";
+import { ClipboardList, Flame, Calendar, Handshake, CheckCircle2, TrendingUp } from "lucide-react";
 import LeadTable from "@/components/LeadTable";
 import {
   StatusBarChart,
@@ -46,7 +47,10 @@ export default async function AdminDashboard() {
       },
     }),
     prisma.lead.count({ where: { status: "TRANSFERRED_TO_SALES" } }),
-    prisma.lead.count({ where: { status: "CLOSED_WON" } }),
+    // A deal can be closed from the Tele-Sales `status` field (Admin/Head
+    // closing on an employee's behalf) or from `salesStatus` (the normal
+    // case: Sales closes it themselves) — count both.
+    prisma.lead.count({ where: { OR: [{ status: "CLOSED_WON" }, { salesStatus: "CLOSED_WON" }] } }),
     prisma.lead.count({ where: { status: "CLOSED_LOST" } }),
     prisma.lead.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.lead.groupBy({ by: ["tier"], _count: { _all: true } }),
@@ -99,12 +103,16 @@ export default async function AdminDashboard() {
         where: { userId: emp.id, type: "TRANSFERRED" }
       });
 
-      // Count closed won/lost (Sales metric)
+      // Count closed won (Sales metric). A deal can be closed from the
+      // Tele-Sales `status` field (Admin/Head closing on the employee's
+      // behalf) or from `salesStatus` (the normal case: Sales closes it
+      // themselves) — count both.
       const wonCount = await prisma.lead.count({
-        where: { assignedToId: emp.id, status: "CLOSED_WON" }
+        where: { assignedToId: emp.id, OR: [{ status: "CLOSED_WON" }, { salesStatus: "CLOSED_WON" }] }
       });
-      const enteredMeetingsCount = await prisma.activity.count({
-        where: { userId: emp.id, type: "MEETING" }
+      // Meetings actually held (not just scheduled) by this employee.
+      const enteredMeetingsCount = await prisma.meeting.count({
+        where: { ownerId: emp.id, status: "DONE" }
       });
       const followUpsCount = await prisma.followUp.count({
         where: { createdById: emp.id }
@@ -131,89 +139,91 @@ export default async function AdminDashboard() {
   for (let i = 0; i < 14; i++) {
     const d = new Date(since);
     d.setDate(d.getDate() + i);
-    dayBuckets[d.toLocaleDateString("ar-EG", { day: "2-digit", month: "2-digit" })] = 0;
+    dayBuckets[d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit" })] = 0;
   }
   recentLeads.forEach((l) => {
-    const key = l.createdAt.toLocaleDateString("ar-EG", { day: "2-digit", month: "2-digit" });
+    const key = l.createdAt.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit" });
     if (key in dayBuckets) dayBuckets[key] += 1;
   });
   const timeSeries = Object.entries(dayBuckets).map(([date, count]) => ({ date, count }));
   const conversionRate = totalLeads > 0 ? ((closedWon / totalLeads) * 100).toFixed(1) : "0";
 
   return (
-    <DashboardShell title="لوحة تحكم الإدارة">
+    <DashboardShell title="Admin Dashboard">
       <StaleLeadsChecker />
-      
+
       <AdminTodoList followUps={todayFollowUps} meetings={todayMeetings} />
 
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-6">
-        <StatCard label="إجمالي الليدز" value={totalLeads} icon="📋" />
-        <StatCard label="Hot / Cold" value={hotGold} icon="🔥" accent="text-status-hot" />
-        <StatCard label="Meetings اليوم" value={meetingsToday} icon="📅" />
-        <StatCard label="تم التحويل" value={transferred} icon="🤝" />
-        <StatCard label="العقود" value={closedWon} icon="✅" accent="text-status-won" />
-        <StatCard label="نسبة التحويل" value={`${conversionRate}%`} icon="📈" accent="text-accent-soft" />
+        <StatCard label="Total Leads" value={totalLeads} icon={<ClipboardList size={18} />} />
+        <StatCard label="Hot / Cold" value={hotGold} icon={<Flame size={18} />} accent="text-status-hot" />
+        <StatCard label="Meetings Today" value={meetingsToday} icon={<Calendar size={18} />} />
+        <StatCard label="Transferred" value={transferred} icon={<Handshake size={18} />} />
+        <StatCard label="Contracts" value={closedWon} icon={<CheckCircle2 size={18} />} accent="text-status-won" />
+        <StatCard label="Conversion Rate" value={`${conversionRate}%`} icon={<TrendingUp size={18} />} accent="text-accent-soft" />
+      </div>
+
+      {/* Full width on its own row — with up to ~10 status categories, a
+          rotated label needs more horizontal room than a half-width panel
+          can give it without overlapping its neighbors. */}
+      <div className="mb-6 glass-panel p-5">
+        <p className="mb-4 text-sm font-semibold text-white">Leads by Status</p>
+        <StatusBarChart data={statusData} />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="glass-panel p-5">
-          <p className="mb-4 text-sm font-semibold text-white">توزيع الليدز حسب الحالة</p>
-          <StatusBarChart data={statusData} />
-        </div>
-        <div className="glass-panel p-5">
-          <p className="mb-4 text-sm font-semibold text-white">توزيع الليدز حسب التصنيف</p>
+          <p className="mb-4 text-sm font-semibold text-white">Leads by Tier</p>
           <TierPieChart data={tierData} />
         </div>
-      </div>
-
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="glass-panel p-5">
-          <p className="mb-4 text-sm font-semibold text-white">أداء الفريق (عدد الليدز الحالية)</p>
+          <p className="mb-4 text-sm font-semibold text-white">Team Performance (Current Lead Count)</p>
           <TeamPerformanceChart data={teamData} />
-        </div>
-        <div className="glass-panel p-5">
-          <p className="mb-4 text-sm font-semibold text-white">ليدز جديدة آخر 14 يوم</p>
-          <LeadsOverTimeChart data={timeSeries} />
         </div>
       </div>
 
       <div className="mb-6 glass-panel p-5">
-        <p className="mb-4 text-sm font-semibold text-white">تفاصيل أداء الفريق (متابعة الأكشن)</p>
+        <p className="mb-4 text-sm font-semibold text-white">New Leads, Last 14 Days</p>
+        <LeadsOverTimeChart data={timeSeries} />
+      </div>
+
+      <div className="mb-6 glass-panel p-5">
+        <p className="mb-4 text-sm font-semibold text-white">Team Performance Details (Action Tracking)</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {teamWithActions.map((emp) => (
             <div key={emp.name} className="rounded-xl bg-white/[0.03] p-4 border border-white/5 relative overflow-hidden group hover:border-white/10 transition">
               <div className="absolute top-0 right-0 h-full w-1 bg-accent/50"></div>
               <p className="text-sm text-slate-200 font-bold truncate pr-2">{emp.name}</p>
               <p className="text-[11px] text-slate-500 mb-4 pr-2">
-                {emp.role === "TELE_SALES" ? "مبيعات هاتفية (Tele-Sales)" : (emp.role === "SALES" ? "مبيعات (Sales)" : emp.role)}
+                {emp.role === "TELE_SALES" ? "Tele-Sales" : (emp.role === "SALES" ? "Sales" : emp.role)}
               </p>
-              
+
               <div className="flex flex-col gap-3 mt-3 pt-3 border-t border-white/5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-slate-500 font-medium">إجمالي استلام</p>
+                    <p className="text-[10px] text-slate-500 font-medium">Total Received</p>
                     <p className="text-lg font-bold text-white mt-0.5">{emp._count.assignedLeads}</p>
                   </div>
                   <div className="text-left">
-                    <p className="text-[10px] text-emerald-500/80 font-medium">تم اتخاذ أكشن</p>
+                    <p className="text-[10px] text-emerald-500/80 font-medium">Action Taken</p>
                     <p className="text-lg font-bold text-emerald-400 mt-0.5">{emp.actionCount}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between border-t border-white/[0.02] pt-2">
                   {emp.role === "TELE_SALES" ? (
                     <div className="text-right w-full">
-                      <p className="text-[10px] text-purple-500/80 font-medium">تحويل لـ السيلز</p>
+                      <p className="text-[10px] text-purple-500/80 font-medium">Transferred to Sales</p>
                       <p className="text-lg font-bold text-purple-400 mt-0.5">{emp.transferredCount}</p>
                     </div>
                   ) : (
                     <>
                       <div className="text-right">
-                        <p className="text-[10px] text-emerald-500/80 font-medium">العقود</p>
+                        <p className="text-[10px] text-emerald-500/80 font-medium">Contracts</p>
                         <p className="text-lg font-bold text-emerald-400 mt-0.5">{emp.wonCount}</p>
                       </div>
                       <div className="text-left">
-                        <p className="text-[10px] text-blue-500/80 font-medium">تم دخول ميتنج</p>
+                        <p className="text-[10px] text-blue-500/80 font-medium">Meetings Held</p>
                         <p className="text-lg font-bold text-blue-400 mt-0.5">{emp.enteredMeetingsCount}</p>
                       </div>
                     </>
@@ -223,12 +233,12 @@ export default async function AdminDashboard() {
                 {emp.role === "SALES" && (
                   <div className="flex items-center justify-between border-t border-white/[0.02] pt-2">
                     <div className="text-right">
-                      <p className="text-[10px] text-amber-500/80 font-medium">تم تحديد متابعة</p>
+                      <p className="text-[10px] text-amber-500/80 font-medium">Follow-ups Scheduled</p>
                       <p className="text-lg font-bold text-amber-400 mt-0.5">{emp.followUpsCount}</p>
                     </div>
                     <div className="text-left">
-                      <p className="text-[10px] text-indigo-500/80 font-medium">عقود مرفوعة</p>
-                      <p className="text-lg font-bold text-indigo-400 mt-0.5">{emp.uploadedContractsCount}</p>
+                      <p className="text-[10px] text-accent/80 font-medium">Contracts Uploaded</p>
+                      <p className="text-lg font-bold text-accent-soft mt-0.5">{emp.uploadedContractsCount}</p>
                     </div>
                   </div>
                 )}
